@@ -1,0 +1,44 @@
+<section class="plan-page">
+  <div class="toolbox">
+    <h2>Plan</h2>
+    <div class="toolbox__actions">
+      <button type="button" class="tool" (click)="addTable()">+ Table</button>
+      <button type="button" class="tool" (click)="addColumn()">+ Column</button>
+      <button type="button" class="tool" (click)="addLabel()">+ Label</button>
+      <button type="button" class="tool tool--danger" (click)="removeSelected()" [disabled]="!selectedItem()">
+        Remove selected
+      </button>
+    </div>
+
+    <div class="toolbox__editor" *ngIf="selectedItem() as selected">
+      <label *ngIf="selected.type === 'table'; else genericEditor">
+        Room
+        <select [value]="selected.roomNumber ?? ''" (change)="updateSelectedRoom(roomSelect.value)" #roomSelect>
+          <option value="">Unassigned</option>
+          <option *ngFor="let room of roomOptions" [value]="room.roomNumber">
+            {{ roomLabel(room) }}
+          </option>
+        </select>
+      </label>
+
+      <ng-template #genericEditor>
+        <label>
+          Text
+          <input
+            type="text"
+            [value]="selected.text"
+            (input)="updateSelectedText(textInput.value)"
+            #textInput
+            placeholder="Label"
+          />
+        </label>
+      </ng-template>
+
+      <p class="helper">Drag objects on the grid. Positions snap to grid on drop.</p>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div #stageHost class="stage-host"></div>
+  </div>
+</section>

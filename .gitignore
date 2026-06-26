@@ -1,0 +1,12 @@
+
+.nx/installation
+.nx/cache
+.nx/workspace-data
+.nx/self-healing
+.nx/migrate-runs
+node_modules
+dist
+
+.angular
+
+__screenshots__/

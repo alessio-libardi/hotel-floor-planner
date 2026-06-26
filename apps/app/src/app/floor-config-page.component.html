@@ -1,0 +1,66 @@
+<section class="page" *ngIf="floors$ | async as floors">
+  <div class="stats">
+    <div>
+      <strong>{{ floors.length }}</strong>
+      <span>floors</span>
+    </div>
+    <div>
+      <strong>{{ roomCount(floors) }}</strong>
+      <span>rooms</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <article class="floor-card" *ngFor="let floor of floors; trackBy: trackByFloor">
+      <header class="floor-card__header">
+        <div>
+          <p>Floor {{ floor.number }}</p>
+          <h3>{{ floor.rooms.length }} rooms</h3>
+        </div>
+
+        <button
+          type="button"
+          class="icon-button icon-button--ghost"
+          aria-label="Remove floor"
+          (click)="removeFloor(floor.id)"
+        >
+          -
+        </button>
+      </header>
+
+      <div class="room-list">
+        <article class="room-card" *ngFor="let room of floor.rooms; trackBy: trackByRoom">
+          <div class="room-card__header">
+            <strong>Room {{ room.number }}</strong>
+            <button
+              type="button"
+              class="icon-button icon-button--danger"
+              aria-label="Remove room"
+              (click)="removeRoom(floor.id, room.id)"
+            >
+              -
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <button
+        type="button"
+        class="icon-button icon-button--secondary"
+        aria-label="Add room"
+        (click)="addRoom(floor.id)"
+      >
+        +
+      </button>
+    </article>
+
+    <button
+      type="button"
+      class="floor-card floor-card--add"
+      aria-label="Add floor"
+      (click)="addFloor()"
+    >
+      +
+    </button>
+  </div>
+</section>
