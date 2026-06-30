@@ -24,7 +24,9 @@ export class FloorPlannerApi {
 
   getFloors() {
     const params = new HttpParams().set('_ts', Date.now().toString());
-    return this.http.get<FloorViewModel[]>(`${API_BASE_URL}/floors`, { params });
+    return this.http.get<FloorViewModel[]>(`${API_BASE_URL}/floors`, {
+      params,
+    });
   }
 
   createFloor() {
@@ -32,24 +34,36 @@ export class FloorPlannerApi {
   }
 
   deleteFloor(floorId: string) {
-    return this.http.delete<{ deleted: true }>(`${API_BASE_URL}/floors/${floorId}`);
+    return this.http.delete<{ deleted: true }>(
+      `${API_BASE_URL}/floors/${floorId}`
+    );
   }
 
   createRoom(floorId: string) {
-    return this.http.post<RoomViewModel>(`${API_BASE_URL}/floors/${floorId}/rooms`, {});
+    return this.http.post<RoomViewModel>(
+      `${API_BASE_URL}/floors/${floorId}/rooms`,
+      {}
+    );
   }
 
   updateRoom(floorId: string, roomId: string, label: string) {
-    return this.http.patch<RoomViewModel>(`${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`, { label });
+    return this.http.patch<RoomViewModel>(
+      `${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`,
+      { label }
+    );
   }
 
   deleteRoom(floorId: string, roomId: string) {
-    return this.http.delete<{ deleted: true }>(`${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`);
+    return this.http.delete<{ deleted: true }>(
+      `${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`
+    );
   }
 
   getPlanItems() {
     const params = new HttpParams().set('_ts', Date.now().toString());
-    return this.http.get<PlanItemDto[]>(`${API_BASE_URL}/plan-items`, { params });
+    return this.http.get<PlanItemDto[]>(`${API_BASE_URL}/plan-items`, {
+      params,
+    });
   }
 
   createPlanItem(type: PlanItemType) {
@@ -58,12 +72,22 @@ export class FloorPlannerApi {
 
   updatePlanItem(
     itemId: string,
-    patch: Partial<Pick<PlanItemDto, 'x' | 'y' | 'width' | 'height' | 'text' | 'tableNumber' | 'roomNumber'>>
+    patch: Partial<
+      Pick<
+        PlanItemDto,
+        'x' | 'y' | 'width' | 'height' | 'text' | 'tableNumber' | 'roomNumber'
+      >
+    >
   ) {
-    return this.http.patch<PlanItemDto>(`${API_BASE_URL}/plan-items/${itemId}`, patch);
+    return this.http.patch<PlanItemDto>(
+      `${API_BASE_URL}/plan-items/${itemId}`,
+      patch
+    );
   }
 
   deletePlanItem(itemId: string) {
-    return this.http.delete<{ deleted: true }>(`${API_BASE_URL}/plan-items/${itemId}`);
+    return this.http.delete<{ deleted: true }>(
+      `${API_BASE_URL}/plan-items/${itemId}`
+    );
   }
 }

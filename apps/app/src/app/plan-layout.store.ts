@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
-import { FloorPlannerApi, PlanItemDto, PlanItemType } from './floor-planner.api';
+import {
+  FloorPlannerApi,
+  PlanItemDto,
+  PlanItemType,
+} from './floor-planner.api';
 
 export interface PlanItem {
   id: string;
@@ -42,9 +46,13 @@ export class PlanLayoutStore {
   }
 
   async updateItem(itemId: string, patch: Partial<PlanItem>): Promise<void> {
-    const updated = await firstValueFrom(this.api.updatePlanItem(itemId, patch));
+    const updated = await firstValueFrom(
+      this.api.updatePlanItem(itemId, patch)
+    );
     const nextItem = this.toModel(updated);
-    this.setItems(this.items.map((item) => (item.id === itemId ? nextItem : item)));
+    this.setItems(
+      this.items.map((item) => (item.id === itemId ? nextItem : item))
+    );
   }
 
   async deleteItem(itemId: string): Promise<void> {

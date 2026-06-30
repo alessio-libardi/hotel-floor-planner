@@ -19,72 +19,109 @@ const GRID_SIZE = 24;
   selector: 'app-plan-page',
   imports: [CommonModule],
   templateUrl: './plan-page.component.html',
-  styles: [`
-    :host { display: block; }
-    .plan-page {
-      display: grid;
-      grid-template-columns: 240px 1fr;
-      gap: 12px;
-      max-width: 1440px;
-      margin: 0 auto;
-    }
-    .toolbox, .canvas-wrap {
-      background: rgba(255, 255, 255, 0.86);
-      border: 1px solid rgba(148, 163, 184, 0.24);
-      border-radius: 16px;
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-    }
-    .toolbox {
-      padding: 12px;
-      display: grid;
-      gap: 10px;
-      align-content: start;
-      height: fit-content;
-    }
-    h2 { margin: 0; font-size: 1rem; }
-    .toolbox__actions { display: grid; gap: 8px; }
-    .tool {
-      border: 0;
-      background: #dbeafe;
-      color: #1d4ed8;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font: inherit;
-      cursor: pointer;
-      text-align: left;
-    }
-    .tool:disabled { opacity: 0.5; cursor: not-allowed; }
-    .tool--danger { background: #fee2e2; color: #b91c1c; }
-    .toolbox__editor { display: grid; gap: 8px; }
-    label { display: grid; gap: 6px; font-size: 0.85rem; color: #475569; }
-    input, select {
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font: inherit;
-      background: #fff;
-    }
-    .helper { margin: 0; color: #64748b; font-size: 0.78rem; }
-    .canvas-wrap { padding: 8px; }
-    .stage-host {
-      width: 100%;
-      min-height: 540px;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #f8fafc;
-    }
-    @media (max-width: 980px) {
-      .plan-page { grid-template-columns: 1fr; }
-      .stage-host { min-height: 440px; }
-    }
-  `],
+  styles: [
+    `
+      :host {
+        display: block;
+      }
+      .plan-page {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 12px;
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+      .toolbox,
+      .canvas-wrap {
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 16px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+      }
+      .toolbox {
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        align-content: start;
+        height: fit-content;
+      }
+      h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+      .toolbox__actions {
+        display: grid;
+        gap: 8px;
+      }
+      .tool {
+        border: 0;
+        background: #dbeafe;
+        color: #1d4ed8;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+      }
+      .tool:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .tool--danger {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .toolbox__editor {
+        display: grid;
+        gap: 8px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: #475569;
+      }
+      input,
+      select {
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: inherit;
+        background: #fff;
+      }
+      .helper {
+        margin: 0;
+        color: #64748b;
+        font-size: 0.78rem;
+      }
+      .canvas-wrap {
+        padding: 8px;
+      }
+      .stage-host {
+        width: 100%;
+        min-height: 540px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f8fafc;
+      }
+      @media (max-width: 980px) {
+        .plan-page {
+          grid-template-columns: 1fr;
+        }
+        .stage-host {
+          min-height: 440px;
+        }
+      }
+    `,
+  ],
 })
 export class PlanPageComponent implements AfterViewInit, OnDestroy {
   @ViewChild('stageHost', { static: true })
   private readonly stageHost!: ElementRef<HTMLDivElement>;
 
   protected readonly selectedItem = signal<PlanItem | null>(null);
-  protected roomOptions: Array<{ floorNumber: number; roomNumber: number }> = [];
+  protected roomOptions: Array<{ floorNumber: number; roomNumber: number }> =
+    [];
 
   private stage: Konva.Stage | null = null;
   private gridLayer: Konva.Layer | null = null;
@@ -168,7 +205,10 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
 
     const existing = roomNumber
       ? this.store.items.find(
-          (item) => item.type === 'table' && item.id !== selected.id && item.roomNumber === roomNumber
+          (item) =>
+            item.type === 'table' &&
+            item.id !== selected.id &&
+            item.roomNumber === roomNumber
         )
       : undefined;
 
@@ -188,7 +228,10 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  protected roomLabel(room: { floorNumber: number; roomNumber: number }): string {
+  protected roomLabel(room: {
+    floorNumber: number;
+    roomNumber: number;
+  }): string {
     return `Floor ${room.floorNumber} - Room ${room.roomNumber}`;
   }
 
@@ -355,7 +398,9 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
     this.roomOptions = this.extractRooms(floors);
   }
 
-  private extractRooms(floors: FloorViewModel[]): Array<{ floorNumber: number; roomNumber: number }> {
+  private extractRooms(
+    floors: FloorViewModel[]
+  ): Array<{ floorNumber: number; roomNumber: number }> {
     return floors.flatMap((floor) =>
       floor.rooms.map((room) => ({
         floorNumber: floor.number,

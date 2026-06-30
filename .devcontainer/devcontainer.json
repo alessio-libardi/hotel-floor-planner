@@ -12,10 +12,7 @@
   ],
   "customizations": {
     "vscode": {
-      "extensions": [
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
-      ],
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"],
       "settings": {
         "editor.formatOnSave": true,
         "js/ts.tsdk.path": "node_modules/typescript/lib"
@@ -24,5 +21,6 @@
   },
   "forwardPorts": [4200, 3000],
   "postCreateCommand": "npm install",
+  "postAttachCommand": "docker compose up -d",
   "remoteUser": "node"
 }
