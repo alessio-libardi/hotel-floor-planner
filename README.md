@@ -18,6 +18,26 @@ npm install
 npm run start
 ```
 
+## Local Firebase emulator
+
+The project uses `evolutecx/firebase-emulator` via `docker-compose.emulators.yml`.
+In this devcontainer/codespace setup, the emulator stack is started automatically on startup.
+
+Manual commands:
+
+```bash
+docker compose -f docker-compose.emulators.yml up -d
+docker compose -f docker-compose.emulators.yml down
+```
+
+Important local URLs:
+
+- Emulator UI: http://localhost:4000
+- Firestore emulator: http://localhost:8080
+- Auth emulator: http://localhost:9099
+
+When the app runs on `localhost`/`127.0.0.1`, it connects to these emulators automatically.
+
 ## Firebase setup
 
 Install Firebase CLI globally (or use `npx firebase-tools`):

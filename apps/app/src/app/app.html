@@ -35,14 +35,20 @@
 
   <section class="auth-panel" *ngIf="!isLoadingAuth && !authUser()">
     <h2>Sign in required</h2>
-    <p>Use Google sign-in to access your planner data in Firestore.</p>
+    <p>
+      Use Google sign-in to access your planner data in Firestore.
+      <span *ngIf="isEmulatorMode"
+        >Local emulator mode uses a local test user.</span
+      >
+    </p>
     <button
       type="button"
       class="auth-button"
       (click)="signIn()"
       [disabled]="authBusy()"
     >
-      {{ authBusy() ? 'Signing in...' : 'Continue with Google' }}
+      {{ authBusy() ? 'Signing in...' : isEmulatorMode ? 'Continue (Local
+      Emulator)' : 'Continue with Google' }}
     </button>
     <p class="auth-error" *ngIf="authError()">{{ authError() }}</p>
   </section>

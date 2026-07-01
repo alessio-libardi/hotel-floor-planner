@@ -2,7 +2,13 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { firebaseAuth, signInWithGoogle, signOutUser } from './firebase.client';
+import {
+  authErrorMessage,
+  firebaseAuth,
+  signInWithGoogle,
+  signOutUser,
+  useFirebaseEmulators,
+} from './firebase.client';
 
 @Component({
   imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
@@ -14,6 +20,7 @@ export class App {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly title = 'Hotel Floor Planner';
+  protected readonly isEmulatorMode = useFirebaseEmulators;
   protected readonly authUser = signal<User | null | undefined>(undefined);
   protected readonly authBusy = signal(false);
   protected readonly authError = signal<string | null>(null);
@@ -38,9 +45,12 @@ export class App {
     try {
       await signInWithGoogle();
     } catch (error) {
-      this.authError.set(
-        error instanceof Error ? error.message : 'Google sign-in failed.'
-      );
+      const message = authErrorMessage(error);
+
+      // Redirect fallback is expected behavior for popup-restricted browsers.
+      if (message !== 'Redirecting to Google sign-in...') {
+        this.authError.set(message);
+      }
     } finally {
       this.authBusy.set(false);
     }

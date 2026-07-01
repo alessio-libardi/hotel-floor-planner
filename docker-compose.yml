@@ -1,0 +1,17 @@
+services:
+  firebase:
+    container_name: firebase-emulator
+    image: evolutecx/firebase-emulator:latest
+    restart: unless-stopped
+    environment:
+      - FB_PROJECT_ID=hotel-floor-planner
+    ports:
+      - '4000:4000' # Emulator UI
+      - '9099:9099' # Auth
+      - '8080:8080' # Firestore
+      - '5001:5001' # Functions
+      - '9199:9199' # Storage
+      - '9000:9000' # Realtime DB
+    volumes:
+      - ./firebase-data:/firebase/data:rw
+
