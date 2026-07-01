@@ -1,22 +1,44 @@
 # hotel-floor-planner
 
-## Local database
+## Architecture
 
-Start PostgreSQL with Docker Compose before running the API:
+This project now runs as an Angular app on Firebase Hosting with Firestore and Firebase Auth.
+
+- Frontend: Angular (`apps/app`)
+- Hosting: Firebase Hosting
+- Data: Firestore
+- Auth requirement: Firebase Auth
+
+## Local development
+
+Install dependencies and start the app:
 
 ```bash
-npm run db:start
+npm install
+npm run start
 ```
 
-The backend uses these defaults when connecting locally:
+## Firebase setup
 
-- `PGHOST=localhost`
-- `PGPORT=5432`
-- `PGUSER=postgres`
-- `PGPASSWORD=postgres`
-- `PGDATABASE=hotel_floor_planner`
+Install Firebase CLI globally (or use `npx firebase-tools`):
 
-Use `npm run db:stop` to shut the container down.
+```bash
+npm install -g firebase-tools
+firebase login
+firebase use hotel-floor-planner
+```
+
+Deploy commands:
+
+```bash
+npm run firebase:deploy
+npm run firebase:deploy:hosting
+```
+
+## Firestore auth
+
+Firestore rules require authenticated users (`request.auth != null`).
+This app uses Google sign-in, so enable the Google provider in Firebase Authentication.
 
 ## Formatting
 
@@ -24,6 +46,6 @@ This workspace uses Prettier as the single formatter, integrated with ESLint to 
 
 - `npm run format` formats the repository in place.
 - `npm run format:check` verifies formatting without changing files.
-- `npm run lint -- app` runs ESLint with Prettier checks enabled.
+- `npm run lint` runs ESLint with Prettier checks enabled.
 
 Prettier and ESLint are configured to work together seamlessly—ESLint will report Prettier violations, and both tools follow the same formatting rules.

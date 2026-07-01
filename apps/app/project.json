@@ -9,9 +9,7 @@
   "targets": {
     "build": {
       "executor": "@angular/build:application",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/app",
@@ -24,9 +22,7 @@
             "input": "apps/app/public"
           }
         ],
-        "styles": [
-          "apps/app/src/styles.css"
-        ]
+        "styles": ["apps/app/src/styles.css"]
       },
       "configurations": {
         "production": {
@@ -34,7 +30,7 @@
             {
               "type": "initial",
               "maximumWarning": "500kb",
-              "maximumError": "1mb"
+              "maximumError": "1.2mb"
             },
             {
               "type": "anyComponentStyle",
@@ -62,12 +58,6 @@
         "development": {
           "buildTarget": "app:build:development"
         }
-      },
-      "dependsOn": [
-        "api:serve"
-      ],
-      "options": {
-        "proxyConfig": "apps/app/proxy.conf.json"
       }
     },
     "lint": {

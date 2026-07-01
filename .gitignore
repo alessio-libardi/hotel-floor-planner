@@ -6,7 +6,7 @@
 .nx/migrate-runs
 node_modules
 dist
-
+firebase-debug.log
 .angular
 
 __screenshots__/

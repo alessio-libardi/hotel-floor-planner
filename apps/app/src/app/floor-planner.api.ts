@@ -1,8 +1,19 @@
-import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  runTransaction,
+  updateDoc,
+} from 'firebase/firestore';
+import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
-
-const API_BASE_URL = '/api';
+import { ensureSignedIn, firestore } from './firebase.client';
 
 export type PlanItemType = 'table' | 'column' | 'label';
 
@@ -18,56 +29,60 @@ export interface PlanItemDto {
   roomNumber: number | null;
 }
 
+interface RoomDoc {
+  id: string;
+  label: string;
+  position: number;
+}
+
+interface FloorDoc {
+  number: number;
+  rooms: RoomDoc[];
+}
+
+interface PlanItemDoc {
+  type: PlanItemType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+  tableNumber: number | null;
+  roomNumber: number | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FloorPlannerApi {
-  private readonly http = inject(HttpClient);
-
   getFloors() {
-    const params = new HttpParams().set('_ts', Date.now().toString());
-    return this.http.get<FloorViewModel[]>(`${API_BASE_URL}/floors`, {
-      params,
-    });
+    return from(this.getFloorsInternal());
   }
 
   createFloor() {
-    return this.http.post<FloorViewModel>(`${API_BASE_URL}/floors`, {});
+    return from(this.createFloorInternal());
   }
 
   deleteFloor(floorId: string) {
-    return this.http.delete<{ deleted: true }>(
-      `${API_BASE_URL}/floors/${floorId}`
-    );
+    return from(this.deleteFloorInternal(floorId));
   }
 
   createRoom(floorId: string) {
-    return this.http.post<RoomViewModel>(
-      `${API_BASE_URL}/floors/${floorId}/rooms`,
-      {}
-    );
+    return from(this.createRoomInternal(floorId));
   }
 
   updateRoom(floorId: string, roomId: string, label: string) {
-    return this.http.patch<RoomViewModel>(
-      `${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`,
-      { label }
-    );
+    return from(this.updateRoomInternal(floorId, roomId, label));
   }
 
   deleteRoom(floorId: string, roomId: string) {
-    return this.http.delete<{ deleted: true }>(
-      `${API_BASE_URL}/floors/${floorId}/rooms/${roomId}`
-    );
+    return from(this.deleteRoomInternal(floorId, roomId));
   }
 
   getPlanItems() {
-    const params = new HttpParams().set('_ts', Date.now().toString());
-    return this.http.get<PlanItemDto[]>(`${API_BASE_URL}/plan-items`, {
-      params,
-    });
+    return from(this.getPlanItemsInternal());
   }
 
   createPlanItem(type: PlanItemType) {
-    return this.http.post<PlanItemDto>(`${API_BASE_URL}/plan-items`, { type });
+    return from(this.createPlanItemInternal(type));
   }
 
   updatePlanItem(
@@ -79,15 +94,317 @@ export class FloorPlannerApi {
       >
     >
   ) {
-    return this.http.patch<PlanItemDto>(
-      `${API_BASE_URL}/plan-items/${itemId}`,
-      patch
-    );
+    return from(this.updatePlanItemInternal(itemId, patch));
   }
 
   deletePlanItem(itemId: string) {
-    return this.http.delete<{ deleted: true }>(
-      `${API_BASE_URL}/plan-items/${itemId}`
+    return from(this.deletePlanItemInternal(itemId));
+  }
+
+  private async getFloorsInternal(): Promise<FloorViewModel[]> {
+    await ensureSignedIn();
+
+    const floorsSnapshot = await getDocs(
+      query(collection(firestore, 'floors'), orderBy('number', 'asc'))
     );
+
+    return floorsSnapshot.docs.map((entry) =>
+      this.toFloorModel(entry.id, entry.data() as FloorDoc)
+    );
+  }
+
+  private async createFloorInternal(): Promise<FloorViewModel> {
+    await ensureSignedIn();
+
+    const maxSnapshot = await getDocs(
+      query(
+        collection(firestore, 'floors'),
+        orderBy('number', 'desc'),
+        limit(1)
+      )
+    );
+    const maxFloor = maxSnapshot.docs[0]?.data() as FloorDoc | undefined;
+    const nextFloorNumber = (maxFloor?.number ?? 0) + 1;
+
+    const result = await runTransaction(firestore, async (transaction) => {
+      const floorRef = doc(collection(firestore, 'floors'));
+      const floorPayload: FloorDoc = {
+        number: nextFloorNumber,
+        rooms: [],
+      };
+
+      transaction.set(floorRef, floorPayload);
+
+      return this.toFloorModel(floorRef.id, floorPayload);
+    });
+
+    return result;
+  }
+
+  private async deleteFloorInternal(
+    floorId: string
+  ): Promise<{ deleted: true }> {
+    await ensureSignedIn();
+
+    await deleteDoc(doc(firestore, 'floors', floorId));
+    return { deleted: true };
+  }
+
+  private async createRoomInternal(floorId: string): Promise<RoomViewModel> {
+    await ensureSignedIn();
+
+    return runTransaction(firestore, async (transaction) => {
+      const floorRef = doc(firestore, 'floors', floorId);
+      const floorSnapshot = await transaction.get(floorRef);
+
+      if (!floorSnapshot.exists()) {
+        throw new Error('Floor not found');
+      }
+
+      const floorData = floorSnapshot.data() as FloorDoc;
+      const rooms = [...(floorData.rooms ?? [])];
+      const nextPosition =
+        Math.max(0, ...rooms.map((room) => room.position)) + 1;
+      const roomId = this.createId();
+
+      const nextRoom: RoomDoc = {
+        id: roomId,
+        position: nextPosition,
+        label: `Room ${floorData.number * 100 + nextPosition}`,
+      };
+
+      transaction.update(floorRef, { rooms: [...rooms, nextRoom] });
+
+      return {
+        id: nextRoom.id,
+        label: nextRoom.label,
+        number: floorData.number * 100 + nextRoom.position,
+      };
+    });
+  }
+
+  private async updateRoomInternal(
+    floorId: string,
+    roomId: string,
+    label: string
+  ): Promise<RoomViewModel> {
+    await ensureSignedIn();
+
+    return runTransaction(firestore, async (transaction) => {
+      const floorRef = doc(firestore, 'floors', floorId);
+      const floorSnapshot = await transaction.get(floorRef);
+
+      if (!floorSnapshot.exists()) {
+        throw new Error('Floor not found');
+      }
+
+      const floorData = floorSnapshot.data() as FloorDoc;
+      const rooms = [...(floorData.rooms ?? [])];
+      const roomIndex = rooms.findIndex((room) => room.id === roomId);
+
+      if (roomIndex < 0) {
+        throw new Error('Room not found');
+      }
+
+      const updatedRoom: RoomDoc = {
+        ...rooms[roomIndex],
+        label: label.trim(),
+      };
+
+      rooms[roomIndex] = updatedRoom;
+      transaction.update(floorRef, { rooms });
+
+      return {
+        id: updatedRoom.id,
+        label: updatedRoom.label,
+        number: floorData.number * 100 + updatedRoom.position,
+      };
+    });
+  }
+
+  private async deleteRoomInternal(
+    floorId: string,
+    roomId: string
+  ): Promise<{ deleted: true }> {
+    await ensureSignedIn();
+
+    await runTransaction(firestore, async (transaction) => {
+      const floorRef = doc(firestore, 'floors', floorId);
+      const floorSnapshot = await transaction.get(floorRef);
+
+      if (!floorSnapshot.exists()) {
+        throw new Error('Floor not found');
+      }
+
+      const floorData = floorSnapshot.data() as FloorDoc;
+      const remainingRooms = (floorData.rooms ?? [])
+        .filter((room) => room.id !== roomId)
+        .sort((left, right) => left.position - right.position)
+        .map((room, index) => ({ ...room, position: index }));
+
+      transaction.update(floorRef, { rooms: remainingRooms });
+    });
+
+    return { deleted: true };
+  }
+
+  private async getPlanItemsInternal(): Promise<PlanItemDto[]> {
+    await ensureSignedIn();
+
+    const planItemsSnapshot = await getDocs(
+      query(
+        collection(firestore, 'planItems'),
+        orderBy('type', 'asc'),
+        orderBy('__name__', 'asc')
+      )
+    );
+
+    const items = planItemsSnapshot.docs.map((entry) =>
+      this.toPlanItemModel(entry.id, entry.data() as PlanItemDoc)
+    );
+
+    return items.sort((left, right) => {
+      if (left.type !== right.type) {
+        return left.type.localeCompare(right.type);
+      }
+
+      if (left.tableNumber == null && right.tableNumber == null) {
+        return left.id.localeCompare(right.id);
+      }
+
+      if (left.tableNumber == null) {
+        return 1;
+      }
+
+      if (right.tableNumber == null) {
+        return -1;
+      }
+
+      if (left.tableNumber !== right.tableNumber) {
+        return left.tableNumber - right.tableNumber;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  }
+
+  private async createPlanItemInternal(
+    type: PlanItemType
+  ): Promise<PlanItemDto> {
+    await ensureSignedIn();
+
+    let nextTableNumber: number | null = null;
+
+    if (type === 'table') {
+      const tableSnapshot = await getDocs(
+        query(
+          collection(firestore, 'planItems'),
+          orderBy('tableNumber', 'desc'),
+          limit(1)
+        )
+      );
+
+      const currentMax = tableSnapshot.docs[0]?.data() as
+        | PlanItemDoc
+        | undefined;
+      nextTableNumber = (currentMax?.tableNumber ?? 0) + 1;
+    }
+
+    return runTransaction(firestore, async (transaction) => {
+      const itemRef = doc(collection(firestore, 'planItems'));
+      const payload: PlanItemDoc = {
+        type,
+        x: 48,
+        y: 48,
+        width: type === 'label' ? 120 : 74,
+        height: type === 'label' ? 28 : 74,
+        text: type === 'column' ? 'Column' : '',
+        tableNumber: nextTableNumber,
+        roomNumber: null,
+      };
+
+      transaction.set(itemRef, payload);
+      return this.toPlanItemModel(itemRef.id, payload);
+    });
+  }
+
+  private async updatePlanItemInternal(
+    itemId: string,
+    patch: Partial<
+      Pick<
+        PlanItemDto,
+        'x' | 'y' | 'width' | 'height' | 'text' | 'tableNumber' | 'roomNumber'
+      >
+    >
+  ): Promise<PlanItemDto> {
+    await ensureSignedIn();
+
+    const itemRef = doc(firestore, 'planItems', itemId);
+    const updatePayload = this.withDefinedValues(patch);
+
+    if (Object.keys(updatePayload).length > 0) {
+      await updateDoc(itemRef, updatePayload);
+    }
+
+    const snapshot = await getDoc(itemRef);
+
+    if (!snapshot.exists()) {
+      throw new Error('Plan item not found');
+    }
+
+    return this.toPlanItemModel(snapshot.id, snapshot.data() as PlanItemDoc);
+  }
+
+  private async deletePlanItemInternal(
+    itemId: string
+  ): Promise<{ deleted: true }> {
+    await ensureSignedIn();
+
+    await deleteDoc(doc(firestore, 'planItems', itemId));
+    return { deleted: true };
+  }
+
+  private toFloorModel(id: string, floor: FloorDoc): FloorViewModel {
+    const rooms = [...(floor.rooms ?? [])]
+      .sort((left, right) => left.position - right.position)
+      .map((room) => ({
+        id: room.id,
+        label: room.label,
+        number: floor.number * 100 + room.position,
+      }));
+
+    return {
+      id,
+      number: floor.number,
+      rooms,
+    };
+  }
+
+  private toPlanItemModel(id: string, item: PlanItemDoc): PlanItemDto {
+    return {
+      id,
+      type: item.type,
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      text: item.text,
+      tableNumber: item.tableNumber,
+      roomNumber: item.roomNumber,
+    };
+  }
+
+  private withDefinedValues<T extends Record<string, unknown>>(
+    value: T
+  ): Partial<T> {
+    return Object.fromEntries(
+      Object.entries(value).filter(([, entry]) => entry !== undefined)
+    ) as Partial<T>;
+  }
+
+  private createId(): string {
+    return globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID()
+      : `room_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 }
