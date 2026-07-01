@@ -84,3 +84,5 @@ jobs:
 
       - name: Deploy hosting and firestore rules
         run: npm run firebase:deploy -- --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
