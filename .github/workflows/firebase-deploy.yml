@@ -55,7 +55,7 @@ jobs:
         run: npm ci
 
       - name: Delete shared preview channel
-        run: npx firebase-tools hosting:channel:delete preview --project hotel-floor-planner --force
+        run: npm run firebase:deploy -- hosting:channel:delete preview --project hotel-floor-planner --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
@@ -83,4 +83,4 @@ jobs:
         run: npm run build
 
       - name: Deploy hosting and firestore rules
-        run: firebase deploy --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
+        run: npm run firebase:deploy -- --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
