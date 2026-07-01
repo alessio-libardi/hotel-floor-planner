@@ -81,5 +81,3 @@ jobs:
 
       - name: Deploy hosting and firestore rules
         run: npx firebase-tools deploy --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
