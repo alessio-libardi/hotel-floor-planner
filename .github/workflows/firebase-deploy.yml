@@ -63,6 +63,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Deploy Production
+    environment:
+      name: Live
+      url: https://hotel-floor-planner.web.app
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,4 +83,4 @@ jobs:
         run: npm run build
 
       - name: Deploy hosting and firestore rules
-        run: npx firebase-tools deploy --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
+        run: firebase deploy --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
