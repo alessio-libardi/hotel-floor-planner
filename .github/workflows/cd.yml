@@ -1,4 +1,4 @@
-name: Firebase Deploy
+name: CD
 
 on:
   pull_request:
@@ -59,14 +59,20 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    name: Deploy Production
+  live:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    name: Live
     environment:
       name: Live
-      url: https://hotel-floor-planner.web.app
+      url: ${{ vars.WEBSITE_URL }}
+    runs-on: ubuntu-latest
     steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
+          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -78,11 +84,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - uses: google-github-actions/auth@v2
-        with:
-          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
-          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
 
       - name: Build app
         run: npm run build
