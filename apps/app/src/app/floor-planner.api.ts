@@ -10,6 +10,7 @@ import {
   query,
   runTransaction,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
@@ -27,12 +28,15 @@ export interface PlanItemDto {
   text: string;
   tableNumber: number | null;
   roomNumber: number | null;
+  linkedTableIds: string[];
 }
 
 interface RoomDoc {
   id: string;
   label: string;
   position: number;
+  arrivalDate: string | null;
+  departureDate: string | null;
 }
 
 interface FloorDoc {
@@ -49,6 +53,7 @@ interface PlanItemDoc {
   text: string;
   tableNumber: number | null;
   roomNumber: number | null;
+  linkedTableIds: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -73,6 +78,14 @@ export class FloorPlannerApi {
     return from(this.updateRoomInternal(floorId, roomId, label));
   }
 
+  updateRoomDetails(
+    floorId: string,
+    roomId: string,
+    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
+  ) {
+    return from(this.updateRoomDetailsInternal(floorId, roomId, details));
+  }
+
   deleteRoom(floorId: string, roomId: string) {
     return from(this.deleteRoomInternal(floorId, roomId));
   }
@@ -90,7 +103,14 @@ export class FloorPlannerApi {
     patch: Partial<
       Pick<
         PlanItemDto,
-        'x' | 'y' | 'width' | 'height' | 'text' | 'tableNumber' | 'roomNumber'
+        | 'x'
+        | 'y'
+        | 'width'
+        | 'height'
+        | 'text'
+        | 'tableNumber'
+        | 'roomNumber'
+        | 'linkedTableIds'
       >
     >
   ) {
@@ -171,6 +191,8 @@ export class FloorPlannerApi {
         id: roomId,
         position: nextPosition,
         label: `Room ${floorData.number * 100 + nextPosition}`,
+        arrivalDate: null,
+        departureDate: null,
       };
 
       transaction.update(floorRef, { rooms: [...rooms, nextRoom] });
@@ -179,6 +201,8 @@ export class FloorPlannerApi {
         id: nextRoom.id,
         label: nextRoom.label,
         number: floorData.number * 100 + nextRoom.position,
+        arrivalDate: nextRoom.arrivalDate,
+        departureDate: nextRoom.departureDate,
       };
     });
   }
@@ -218,6 +242,8 @@ export class FloorPlannerApi {
         id: updatedRoom.id,
         label: updatedRoom.label,
         number: floorData.number * 100 + updatedRoom.position,
+        arrivalDate: updatedRoom.arrivalDate,
+        departureDate: updatedRoom.departureDate,
       };
     });
   }
@@ -246,6 +272,48 @@ export class FloorPlannerApi {
     });
 
     return { deleted: true };
+  }
+
+  private async updateRoomDetailsInternal(
+    floorId: string,
+    roomId: string,
+    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
+  ): Promise<RoomViewModel> {
+    await ensureSignedIn();
+
+    return runTransaction(firestore, async (transaction) => {
+      const floorRef = doc(firestore, 'floors', floorId);
+      const floorSnapshot = await transaction.get(floorRef);
+
+      if (!floorSnapshot.exists()) {
+        throw new Error('Floor not found');
+      }
+
+      const floorData = floorSnapshot.data() as FloorDoc;
+      const rooms = [...(floorData.rooms ?? [])];
+      const roomIndex = rooms.findIndex((room) => room.id === roomId);
+
+      if (roomIndex < 0) {
+        throw new Error('Room not found');
+      }
+
+      const updatedRoom: RoomDoc = {
+        ...rooms[roomIndex],
+        arrivalDate: details.arrivalDate,
+        departureDate: details.departureDate,
+      };
+
+      rooms[roomIndex] = updatedRoom;
+      transaction.update(floorRef, { rooms });
+
+      return {
+        id: updatedRoom.id,
+        label: updatedRoom.label,
+        number: floorData.number * 100 + updatedRoom.position,
+        arrivalDate: updatedRoom.arrivalDate,
+        departureDate: updatedRoom.departureDate,
+      };
+    });
   }
 
   private async getPlanItemsInternal(): Promise<PlanItemDto[]> {
@@ -321,6 +389,7 @@ export class FloorPlannerApi {
         text: type === 'column' ? 'Column' : '',
         tableNumber: nextTableNumber,
         roomNumber: null,
+        linkedTableIds: [],
       };
 
       transaction.set(itemRef, payload);
@@ -333,7 +402,14 @@ export class FloorPlannerApi {
     patch: Partial<
       Pick<
         PlanItemDto,
-        'x' | 'y' | 'width' | 'height' | 'text' | 'tableNumber' | 'roomNumber'
+        | 'x'
+        | 'y'
+        | 'width'
+        | 'height'
+        | 'text'
+        | 'tableNumber'
+        | 'roomNumber'
+        | 'linkedTableIds'
       >
     >
   ): Promise<PlanItemDto> {
@@ -360,7 +436,33 @@ export class FloorPlannerApi {
   ): Promise<{ deleted: true }> {
     await ensureSignedIn();
 
-    await deleteDoc(doc(firestore, 'planItems', itemId));
+    const itemRef = doc(firestore, 'planItems', itemId);
+    const itemSnapshot = await getDoc(itemRef);
+    const item = itemSnapshot.exists()
+      ? (itemSnapshot.data() as PlanItemDoc)
+      : null;
+
+    await deleteDoc(itemRef);
+
+    if (item?.type === 'table') {
+      const linkedItemsSnapshot = await getDocs(
+        query(
+          collection(firestore, 'planItems'),
+          where('linkedTableIds', 'array-contains', itemId)
+        )
+      );
+
+      await Promise.all(
+        linkedItemsSnapshot.docs.map((entry) => {
+          const linkedTableIds = (
+            (entry.data() as PlanItemDoc).linkedTableIds ?? []
+          ).filter((linkedId) => linkedId !== itemId);
+
+          return updateDoc(entry.ref, { linkedTableIds });
+        })
+      );
+    }
+
     return { deleted: true };
   }
 
@@ -371,6 +473,8 @@ export class FloorPlannerApi {
         id: room.id,
         label: room.label,
         number: floor.number * 100 + room.position,
+        arrivalDate: room.arrivalDate ?? null,
+        departureDate: room.departureDate ?? null,
       }));
 
     return {
@@ -391,6 +495,7 @@ export class FloorPlannerApi {
       text: item.text,
       tableNumber: item.tableNumber,
       roomNumber: item.roomNumber,
+      linkedTableIds: item.linkedTableIds ?? [],
     };
   }
 

@@ -2,6 +2,8 @@ export interface RoomViewModel {
   id: string;
   label: string;
   number: number;
+  arrivalDate: string | null;
+  departureDate: string | null;
 }
 
 export interface FloorViewModel {
