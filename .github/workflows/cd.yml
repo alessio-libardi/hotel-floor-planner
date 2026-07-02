@@ -42,7 +42,7 @@ jobs:
         run: npm run build
 
       - name: Deploy preview
-        run: npm run firebase:deploy -- hosting:channel:deploy ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --expires 7d --json
+        run: npm run firebase:deploy -- hosting:channel:deploy ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner
 
   cleanup_preview:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
