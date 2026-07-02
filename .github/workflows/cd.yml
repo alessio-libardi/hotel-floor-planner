@@ -1,8 +1,6 @@
 name: CD
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
   push:
     branches:
       - main
@@ -12,71 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preview:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    name: Preview
-    environment:
-      name: Preview
-      url: ${{ github.event.pull_request.head.ref }}--${{vars.WEBSITE_URL}}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          create_credentials_file: true
-          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
-          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build app
-        run: npm run build
-
-      - name: Deploy preview
-        run: npm run firebase:preview -- ${{ github.event.pull_request.head.ref }} --expires 7d
-
-  cleanup_preview:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    name: Cleanup preview
-    runs-on: ubuntu-latest
-    environment:
-      name: Preview
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          create_credentials_file: true
-          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
-          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Delete preview
-        run: npm run firebase:delete -- ${{ github.event.pull_request.head.ref }}
-
-  live:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    name: Live
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
     environment:
       name: Live
