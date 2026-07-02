@@ -12,7 +12,15 @@
   ],
   "customizations": {
     "vscode": {
-      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"],
+      "extensions": [
+        "nrwl.angular-console",
+        "angular.ng-template",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github"
+      ],
       "settings": {
         "editor.formatOnSave": true,
         "js/ts.tsdk.path": "node_modules/typescript/lib"
