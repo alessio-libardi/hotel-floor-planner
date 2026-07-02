@@ -17,6 +17,7 @@ export interface PlanItem {
   text: string;
   tableNumber: number | null;
   roomNumber: number | null;
+  linkedTableIds: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -39,25 +40,64 @@ export class PlanLayoutStore {
   }
 
   async addItem(type: PlanItemType): Promise<PlanItem> {
-    const created = await firstValueFrom(this.api.createPlanItem(type));
-    const item = this.toModel(created);
-    this.setItems([...this.items, item]);
-    return item;
+    const previous = this.items;
+    const optimistic = this.createOptimisticItem(type);
+
+    this.setItems([...previous, optimistic]);
+
+    try {
+      const created = await firstValueFrom(this.api.createPlanItem(type));
+      const item = this.toModel(created);
+      this.setItems(
+        this.items.map((entry) => (entry.id === optimistic.id ? item : entry))
+      );
+      return item;
+    } catch (error) {
+      this.setItems(previous);
+      throw error;
+    }
   }
 
   async updateItem(itemId: string, patch: Partial<PlanItem>): Promise<void> {
-    const updated = await firstValueFrom(
-      this.api.updatePlanItem(itemId, patch)
-    );
-    const nextItem = this.toModel(updated);
+    const previous = this.items;
     this.setItems(
-      this.items.map((item) => (item.id === itemId ? nextItem : item))
+      this.items.map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item
+      )
     );
+
+    try {
+      const updated = await firstValueFrom(
+        this.api.updatePlanItem(itemId, patch)
+      );
+      const nextItem = this.toModel(updated);
+      this.setItems(
+        this.items.map((item) => (item.id === itemId ? nextItem : item))
+      );
+    } catch (error) {
+      this.setItems(previous);
+      throw error;
+    }
   }
 
   async deleteItem(itemId: string): Promise<void> {
-    await firstValueFrom(this.api.deletePlanItem(itemId));
-    this.setItems(this.items.filter((item) => item.id !== itemId));
+    const previous = this.items;
+    const withoutDeleted = this.items.filter((item) => item.id !== itemId);
+    this.setItems(
+      withoutDeleted.map((item) => ({
+        ...item,
+        linkedTableIds: item.linkedTableIds.filter(
+          (linkedTableId) => linkedTableId !== itemId
+        ),
+      }))
+    );
+
+    try {
+      await firstValueFrom(this.api.deletePlanItem(itemId));
+    } catch (error) {
+      this.setItems(previous);
+      throw error;
+    }
   }
 
   private setItems(items: PlanItem[]): void {
@@ -75,6 +115,26 @@ export class PlanLayoutStore {
       text: String(item.text ?? ''),
       tableNumber: item.tableNumber,
       roomNumber: item.roomNumber,
+      linkedTableIds: item.linkedTableIds ?? [],
+    };
+  }
+
+  private createOptimisticItem(type: PlanItemType): PlanItem {
+    const highestTableNumber = this.items
+      .filter((item) => item.type === 'table' && item.tableNumber != null)
+      .reduce((max, item) => Math.max(max, item.tableNumber ?? 0), 0);
+
+    return {
+      id: `tmp_item_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      type,
+      x: 48,
+      y: 48,
+      width: type === 'label' ? 120 : 74,
+      height: type === 'label' ? 28 : 74,
+      text: type === 'column' ? 'Column' : '',
+      tableNumber: type === 'table' ? highestTableNumber + 1 : null,
+      roomNumber: null,
+      linkedTableIds: [],
     };
   }
 }

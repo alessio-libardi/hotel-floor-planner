@@ -10,8 +10,8 @@ import {
   shareReplay,
   switchMap,
 } from 'rxjs';
-import { FloorPlannerApi } from './floor-planner.api';
 import { FloorViewModel } from './floor.models';
+import { FloorStore } from './floor.store';
 import { PlanLayoutStore } from './plan-layout.store';
 
 @Component({
@@ -200,11 +200,13 @@ import { PlanLayoutStore } from './plan-layout.store';
   ],
 })
 export class FloorOverviewPageComponent {
-  private readonly api = inject(FloorPlannerApi);
+  private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
 
   protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
-    from(this.planStore.refresh()).pipe(switchMap(() => this.api.getFloors()))
+    from(this.floorStore.ensureLoaded()).pipe(
+      switchMap(() => this.floorStore.floors$)
+    )
   ).pipe(shareReplay(1));
 
   protected readonly roomToTableMap$ = this.planStore.items$.pipe(

@@ -1,14 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import {
-  firstValueFrom,
-  Subject,
-  switchMap,
-  startWith,
-  shareReplay,
-} from 'rxjs';
-import { FloorPlannerApi } from './floor-planner.api';
-import { FloorViewModel } from './floor.models';
+import { FloorViewModel, RoomViewModel } from './floor.models';
+import { FloorStore } from './floor.store';
 
 @Component({
   selector: 'app-floor-config-page',
@@ -137,6 +130,10 @@ import { FloorViewModel } from './floor.models';
         color: #0f172a;
         font-size: 0.9rem;
       }
+      .room-card__actions {
+        display: flex;
+        gap: 6px;
+      }
       .icon-button {
         width: 30px;
         height: 30px;
@@ -172,6 +169,45 @@ import { FloorViewModel } from './floor.models';
         background: #fee2e2;
         color: #b91c1c;
       }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.42);
+        backdrop-filter: blur(2px);
+        display: grid;
+        place-items: center;
+        z-index: 30;
+        padding: 16px;
+      }
+      .modal {
+        width: min(100%, 420px);
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        box-shadow: 0 20px 44px rgba(15, 23, 42, 0.26);
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+      }
+      .modal__header,
+      .modal__actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .modal__body {
+        display: grid;
+        gap: 10px;
+      }
+      .modal__actions {
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .modal__actions .icon-button {
+        width: auto;
+        border-radius: 10px;
+        padding: 8px 12px;
+      }
       @media (max-width: 900px) {
         .hero {
           flex-direction: column;
@@ -181,38 +217,87 @@ import { FloorViewModel } from './floor.models';
   ],
 })
 export class FloorConfigPageComponent implements OnInit {
-  private readonly refreshTrigger$ = new Subject<void>();
+  protected readonly floors$;
+  protected roomDetailsModal: {
+    floorId: string;
+    roomId: string;
+    roomNumber: number;
+    arrivalDate: string;
+    departureDate: string;
+  } | null = null;
 
-  protected readonly floors$ = this.refreshTrigger$.pipe(
-    startWith(void 0),
-    switchMap(() => this.api.getFloors()),
-    shareReplay(1)
-  );
-
-  constructor(private readonly api: FloorPlannerApi) {}
+  constructor(private readonly floorStore: FloorStore) {
+    this.floors$ = this.floorStore.floors$;
+  }
 
   async ngOnInit(): Promise<void> {
-    this.refreshTrigger$.next();
+    await this.floorStore.ensureLoaded();
   }
 
   async addFloor(): Promise<void> {
-    await firstValueFrom(this.api.createFloor());
-    this.refreshTrigger$.next();
+    await this.floorStore.addFloor();
   }
 
   async removeFloor(floorId: string): Promise<void> {
-    await firstValueFrom(this.api.deleteFloor(floorId));
-    this.refreshTrigger$.next();
+    await this.floorStore.removeFloor(floorId);
   }
 
   async addRoom(floorId: string): Promise<void> {
-    await firstValueFrom(this.api.createRoom(floorId));
-    this.refreshTrigger$.next();
+    await this.floorStore.addRoom(floorId);
   }
 
   async removeRoom(floorId: string, roomId: string): Promise<void> {
-    await firstValueFrom(this.api.deleteRoom(floorId, roomId));
-    this.refreshTrigger$.next();
+    await this.floorStore.removeRoom(floorId, roomId);
+  }
+
+  protected openRoomDetails(floorId: string, room: RoomViewModel): void {
+    this.roomDetailsModal = {
+      floorId,
+      roomId: room.id,
+      roomNumber: room.number,
+      arrivalDate: room.arrivalDate ?? '',
+      departureDate: room.departureDate ?? '',
+    };
+  }
+
+  protected closeRoomDetails(): void {
+    this.roomDetailsModal = null;
+  }
+
+  protected async saveRoomDetails(
+    arrivalDateValue: string,
+    departureDateValue: string
+  ): Promise<void> {
+    if (!this.roomDetailsModal) {
+      return;
+    }
+
+    const { floorId, roomId } = this.roomDetailsModal;
+    const arrivalDate = arrivalDateValue || null;
+    const departureDate = departureDateValue || null;
+
+    await this.floorStore.updateRoomDetails(floorId, roomId, {
+      arrivalDate,
+      departureDate,
+    });
+
+    this.roomDetailsModal = null;
+  }
+
+  protected roomDateRange(room: RoomViewModel): string {
+    if (room.arrivalDate && room.departureDate) {
+      return `${room.arrivalDate} to ${room.departureDate}`;
+    }
+
+    if (room.arrivalDate) {
+      return `Arrives ${room.arrivalDate}`;
+    }
+
+    if (room.departureDate) {
+      return `Leaves ${room.departureDate}`;
+    }
+
+    return 'No stay dates';
   }
 
   protected roomCount(floors: FloorViewModel[]): number {

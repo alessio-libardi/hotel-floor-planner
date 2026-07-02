@@ -1,44 +1,104 @@
 <section class="plan-page">
-  <div class="toolbox">
-    <h2>Plan</h2>
-    <div class="toolbox__actions">
-      <button type="button" class="tool" (click)="addTable()">+ Table</button>
-      <button type="button" class="tool" (click)="addColumn()">+ Column</button>
-      <button type="button" class="tool" (click)="addLabel()">+ Label</button>
-      <button type="button" class="tool tool--danger" (click)="removeSelected()" [disabled]="!selectedItem()">
-        Remove selected
-      </button>
-    </div>
-
-    <div class="toolbox__editor" *ngIf="selectedItem() as selected">
-      <label *ngIf="selected.type === 'table'; else genericEditor">
-        Room
-        <select [value]="selected.roomNumber ?? ''" (change)="updateSelectedRoom(roomSelect.value)" #roomSelect>
-          <option value="">Unassigned</option>
-          <option *ngFor="let room of roomOptions" [value]="room.roomNumber">
-            {{ roomLabel(room) }}
-          </option>
-        </select>
-      </label>
-
-      <ng-template #genericEditor>
-        <label>
-          Text
-          <input
-            type="text"
-            [value]="selected.text"
-            (input)="updateSelectedText(textInput.value)"
-            #textInput
-            placeholder="Label"
-          />
-        </label>
-      </ng-template>
-
-      <p class="helper">Drag objects on the grid. Positions snap to grid on drop.</p>
-    </div>
-  </div>
-
   <div class="canvas-wrap">
     <div #stageHost class="stage-host"></div>
+
+    <aside class="toolbox toolbox--overlay">
+      <h2>Plan</h2>
+      <div class="toolbox__actions">
+        <button type="button" class="tool" (click)="addTable()">+ Table</button>
+        <button type="button" class="tool" (click)="addColumn()">
+          + Column
+        </button>
+        <button type="button" class="tool" (click)="addLabel()">+ Label</button>
+        <button
+          type="button"
+          class="tool tool--danger"
+          (click)="removeSelected()"
+          [disabled]="!selectedItem()"
+        >
+          Remove selected
+        </button>
+      </div>
+
+      <div class="toolbox__editor" *ngIf="selectedItem() as selected">
+        <ng-container *ngIf="selected.type === 'table'; else genericEditor">
+          <label>
+            Room
+            <select
+              [value]="selected.roomNumber ?? ''"
+              (change)="updateSelectedRoom(roomSelect.value)"
+              #roomSelect
+            >
+              <option value="">Unassigned</option>
+              <option
+                *ngFor="let room of roomOptions"
+                [value]="room.roomNumber"
+              >
+                {{ roomLabel(room) }}
+              </option>
+            </select>
+          </label>
+
+          <div class="table-links">
+            <p class="helper">
+              Link this table with other tables so groups can sit together
+              across rooms.
+            </p>
+
+            <div
+              class="link-list"
+              *ngIf="availableLinkTargets(selected).length; else noTablesToLink"
+            >
+              <button
+                *ngFor="let table of availableLinkTargets(selected)"
+                type="button"
+                class="tool"
+                [class.tool--active]="isLinkedToSelected(table.id)"
+                (click)="toggleSelectedTableLink(table.id)"
+              >
+                {{ isLinkedToSelected(table.id) ? 'Unlink' : 'Link' }}
+                {{ tableDisplay(table) }}
+              </button>
+            </div>
+
+            <ng-template #noTablesToLink>
+              <p class="helper">Add at least two tables to create a link.</p>
+            </ng-template>
+          </div>
+        </ng-container>
+
+        <ng-template #genericEditor>
+          <label>
+            Text
+            <input
+              type="text"
+              [value]="selected.text"
+              (input)="updateSelectedText(textInput.value)"
+              #textInput
+              placeholder="Label"
+            />
+          </label>
+        </ng-template>
+
+        <p class="helper">
+          Drag items on grid. Use pan mode to move the canvas when zoomed.
+        </p>
+      </div>
+    </aside>
+
+    <div class="viewport-tools">
+      <button type="button" class="tool" (click)="zoomOut()">-</button>
+      <span>{{ zoomPercentage() }}%</span>
+      <button type="button" class="tool" (click)="zoomIn()">+</button>
+      <button type="button" class="tool" (click)="resetView()">Reset</button>
+      <button
+        type="button"
+        class="tool"
+        [class.tool--active]="isPanMode()"
+        (click)="togglePanMode()"
+      >
+        Pan
+      </button>
+    </div>
   </div>
 </section>
