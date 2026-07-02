@@ -43,7 +43,7 @@ jobs:
         run: npm run build
 
       - name: Deploy preview
-        run: npm run firebase:deploy -- hosting:channel:deploy ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner
+        run: npm run firebase:preview -- ${{ github.event.pull_request.head.ref }} --expires 7d
 
   cleanup_preview:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -72,7 +72,7 @@ jobs:
         run: npm ci
 
       - name: Delete preview
-        run: npm run firebase:deploy -- hosting:channel:delete ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --force
+        run: npm run firebase:delete -- ${{ github.event.pull_request.head.ref }}
 
   live:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -105,4 +105,4 @@ jobs:
         run: npm run build
 
       - name: Deploy
-        run: npm run firebase:deploy -- --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
+        run: npm run firebase:deploy -- --only hosting,firestore:rules,firestore:indexes
