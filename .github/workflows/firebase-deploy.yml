@@ -81,7 +81,8 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HOTEL_FLOOR_PLANNER }}'
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
+          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
 
       - name: Build app
         run: npm run build
