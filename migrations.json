@@ -1,0 +1,10 @@
+{
+  "migrations": [],
+  "nx-console": {
+    "initialGitRef": {
+      "ref": "0aaa90c1d82cc8e42f8047246c0bc45c544d752b",
+      "subject": "feat: change app title"
+    },
+    "targetVersion": "latest"
+  }
+}
