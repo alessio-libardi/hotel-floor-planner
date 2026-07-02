@@ -41,7 +41,7 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Deploy shared preview channel
+      - name: Deploy preview
         run: npm run firebase:deploy -- hosting:channel:deploy ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --expires 7d --json
 
   cleanup_preview:
@@ -69,7 +69,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Delete shared preview channel
+      - name: Delete preview
         run: npm run firebase:deploy -- hosting:channel:delete ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --force
 
   live:
@@ -101,5 +101,5 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Deploy hosting and firestore rules
+      - name: Deploy
         run: npm run firebase:deploy -- --project hotel-floor-planner --only hosting,firestore:rules,firestore:indexes
