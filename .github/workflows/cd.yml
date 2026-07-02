@@ -8,17 +8,26 @@ on:
       - main
 
 concurrency:
-  group: firebase-preview-global
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   preview:
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    runs-on: ubuntu-latest
     name: Preview
+    environment:
+      name: Preview
+      url: ${{ github.event.pull_request.head.ref }}--${{vars.WEBSITE_URL}}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
+          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,17 +42,23 @@ jobs:
         run: npm run build
 
       - name: Deploy shared preview channel
-        run: npx firebase-tools hosting:channel:deploy preview --project hotel-floor-planner --expires 7d --json
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npm run firebase:deploy -- hosting:channel:deploy ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --expires 7d --json
 
   cleanup_preview:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    name: Cleanup preview
     runs-on: ubuntu-latest
-    name: Cleanup Preview
+    environment:
+      name: Preview
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
+          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -55,26 +70,24 @@ jobs:
         run: npm ci
 
       - name: Delete shared preview channel
-        run: npm run firebase:deploy -- hosting:channel:delete preview --project hotel-floor-planner --force
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npm run firebase:deploy -- hosting:channel:delete ${{ github.event.pull_request.head.ref }} --project hotel-floor-planner --force
 
   live:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     name: Live
+    runs-on: ubuntu-latest
     environment:
       name: Live
       url: ${{ vars.WEBSITE_URL }}
-    runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
           credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
