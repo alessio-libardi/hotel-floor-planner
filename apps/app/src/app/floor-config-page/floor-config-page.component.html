@@ -1,0 +1,161 @@
+<section *ngIf="floors$ | async as floors" class="grid gap-4">
+  <mat-card>
+    <mat-card-content
+      class="flex flex-wrap items-center justify-between gap-4 py-4"
+    >
+      <div>
+        <p class="m-0 text-xs uppercase tracking-[0.16em] text-slate-500">
+          Floor setup
+        </p>
+        <h2 class="m-0 text-xl font-semibold text-slate-900">
+          Configure rooms and stays
+        </h2>
+      </div>
+
+      <div class="flex gap-2">
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700"
+          >{{ floors.length }} floors</span
+        >
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700"
+          >{{ roomCount(floors) }} rooms</span
+        >
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="grid gap-3 lg:grid-cols-3">
+    <mat-card
+      *ngFor="let floor of floors; trackBy: trackByFloor"
+      class="h-full"
+    >
+      <mat-card-header>
+        <mat-card-title>Floor {{ floor.number }}</mat-card-title>
+        <mat-card-subtitle>{{ floor.rooms.length }} rooms</mat-card-subtitle>
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Remove floor"
+          (click)="removeFloor(floor.id)"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-card-header>
+
+      <mat-card-content class="grid gap-2">
+        <mat-card
+          *ngFor="let room of floor.rooms; trackBy: trackByRoom"
+          appearance="outlined"
+          class="!shadow-none"
+        >
+          <mat-card-content
+            class="flex items-center justify-between gap-2 py-3"
+          >
+            <div>
+              <p class="m-0 font-medium text-slate-800">
+                Room {{ room.number }}
+              </p>
+              <p class="m-0 text-xs text-slate-500">
+                {{ roomDateRange(room) }}
+              </p>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Room details"
+                (click)="openRoomDetails(floor.id, room)"
+              >
+                <mat-icon>info</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Remove room"
+                (click)="removeRoom(floor.id, room.id)"
+              >
+                <mat-icon>remove_circle</mat-icon>
+              </button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </mat-card-content>
+
+      <mat-card-actions>
+        <button mat-stroked-button type="button" (click)="addRoom(floor.id)">
+          <mat-icon>add</mat-icon>
+          Add room
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <button
+      mat-fab
+      extended
+      color="primary"
+      type="button"
+      class="h-14 self-start"
+      (click)="addFloor()"
+    >
+      <mat-icon>add</mat-icon>
+      Add floor
+    </button>
+  </div>
+</section>
+
+<div
+  *ngIf="roomDetailsModal as modal"
+  class="fixed inset-0 z-40 grid place-items-center bg-slate-900/45 p-4"
+>
+  <mat-card class="w-full max-w-md">
+    <mat-card-header>
+      <mat-card-title>Room {{ modal.roomNumber }} details</mat-card-title>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Close room details"
+        (click)="closeRoomDetails()"
+      >
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-card-header>
+
+    <mat-card-content class="grid gap-3">
+      <mat-form-field>
+        <mat-label>Arrival date</mat-label>
+        <input
+          matInput
+          type="date"
+          [value]="modal.arrivalDate"
+          #arrivalDateInput
+        />
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>Go away date</mat-label>
+        <input
+          matInput
+          type="date"
+          [value]="modal.departureDate"
+          #departureDateInput
+        />
+      </mat-form-field>
+    </mat-card-content>
+
+    <mat-card-actions align="end">
+      <button mat-button type="button" (click)="closeRoomDetails()">
+        Cancel
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="
+          saveRoomDetails(arrivalDateInput.value, departureDateInput.value)
+        "
+      >
+        Save
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

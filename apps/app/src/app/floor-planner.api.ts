@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   collection,
   deleteDoc,
@@ -14,7 +14,8 @@ import {
 } from 'firebase/firestore';
 import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
-import { ensureSignedIn, firestore } from './firebase.client';
+import { firestore } from './firebase.client';
+import { AuthService } from './auth.service';
 
 export type PlanItemType = 'table' | 'column' | 'label';
 
@@ -58,6 +59,8 @@ interface PlanItemDoc {
 
 @Injectable({ providedIn: 'root' })
 export class FloorPlannerApi {
+  private readonly auth = inject(AuthService);
+
   getFloors() {
     return from(this.getFloorsInternal());
   }
@@ -122,7 +125,7 @@ export class FloorPlannerApi {
   }
 
   private async getFloorsInternal(): Promise<FloorViewModel[]> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     const floorsSnapshot = await getDocs(
       query(collection(firestore, 'floors'), orderBy('number', 'asc'))
@@ -134,7 +137,7 @@ export class FloorPlannerApi {
   }
 
   private async createFloorInternal(): Promise<FloorViewModel> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     const maxSnapshot = await getDocs(
       query(
@@ -164,14 +167,14 @@ export class FloorPlannerApi {
   private async deleteFloorInternal(
     floorId: string
   ): Promise<{ deleted: true }> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     await deleteDoc(doc(firestore, 'floors', floorId));
     return { deleted: true };
   }
 
   private async createRoomInternal(floorId: string): Promise<RoomViewModel> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     return runTransaction(firestore, async (transaction) => {
       const floorRef = doc(firestore, 'floors', floorId);
@@ -212,7 +215,7 @@ export class FloorPlannerApi {
     roomId: string,
     label: string
   ): Promise<RoomViewModel> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     return runTransaction(firestore, async (transaction) => {
       const floorRef = doc(firestore, 'floors', floorId);
@@ -252,7 +255,7 @@ export class FloorPlannerApi {
     floorId: string,
     roomId: string
   ): Promise<{ deleted: true }> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     await runTransaction(firestore, async (transaction) => {
       const floorRef = doc(firestore, 'floors', floorId);
@@ -279,7 +282,7 @@ export class FloorPlannerApi {
     roomId: string,
     details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
   ): Promise<RoomViewModel> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     return runTransaction(firestore, async (transaction) => {
       const floorRef = doc(firestore, 'floors', floorId);
@@ -317,7 +320,7 @@ export class FloorPlannerApi {
   }
 
   private async getPlanItemsInternal(): Promise<PlanItemDto[]> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     const planItemsSnapshot = await getDocs(
       query(
@@ -359,7 +362,7 @@ export class FloorPlannerApi {
   private async createPlanItemInternal(
     type: PlanItemType
   ): Promise<PlanItemDto> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     let nextTableNumber: number | null = null;
 
@@ -413,7 +416,7 @@ export class FloorPlannerApi {
       >
     >
   ): Promise<PlanItemDto> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     const itemRef = doc(firestore, 'planItems', itemId);
     const updatePayload = this.withDefinedValues(patch);
@@ -434,7 +437,7 @@ export class FloorPlannerApi {
   private async deletePlanItemInternal(
     itemId: string
   ): Promise<{ deleted: true }> {
-    await ensureSignedIn();
+    this.auth.requireUser();
 
     const itemRef = doc(firestore, 'planItems', itemId);
     const itemSnapshot = await getDoc(itemRef);

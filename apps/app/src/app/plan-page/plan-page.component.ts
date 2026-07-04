@@ -7,11 +7,16 @@ import {
   ViewChild,
   signal,
 } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import Konva from 'konva';
 import { Subscription, fromEvent } from 'rxjs';
-import { FloorViewModel } from './floor.models';
-import { FloorStore } from './floor.store';
-import { PlanItem, PlanLayoutStore } from './plan-layout.store';
+import { FloorViewModel } from '../floor.models';
+import { FloorStore } from '../floor.store';
+import { PlanItem, PlanLayoutStore } from '../plan-layout.store';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -21,167 +26,16 @@ const SCALE_STEP = 1.15;
 
 @Component({
   selector: 'app-plan-page',
-  imports: [CommonModule],
-  templateUrl: './plan-page.component.html',
-  styles: [
-    `
-      :host {
-        display: block;
-      }
-      .plan-page {
-        width: 100%;
-      }
-      .canvas-wrap {
-        background: rgba(255, 255, 255, 0.86);
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        border-radius: 16px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-      }
-      .canvas-wrap {
-        position: relative;
-        height: calc(100vh - 190px);
-        min-height: 600px;
-        overflow: hidden;
-      }
-      .toolbox {
-        padding: 12px;
-        display: grid;
-        gap: 10px;
-        align-content: start;
-        background: rgba(255, 255, 255, 0.93);
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        border-radius: 14px;
-        box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
-        backdrop-filter: blur(5px);
-      }
-      .toolbox--overlay {
-        position: absolute;
-        left: 12px;
-        bottom: 12px;
-        width: min(320px, calc(100% - 24px));
-        max-height: calc(100% - 90px);
-        overflow: auto;
-        z-index: 3;
-      }
-      h2 {
-        margin: 0;
-        font-size: 1rem;
-      }
-      .toolbox__actions {
-        display: grid;
-        gap: 8px;
-      }
-      .tool {
-        border: 0;
-        background: #dbeafe;
-        color: #1d4ed8;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font: inherit;
-        cursor: pointer;
-        text-align: left;
-      }
-      .tool:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .tool--active {
-        background: #bfdbfe;
-        color: #1e40af;
-      }
-      .tool--danger {
-        background: #fee2e2;
-        color: #b91c1c;
-      }
-      .toolbox__editor {
-        display: grid;
-        gap: 8px;
-      }
-      label {
-        display: grid;
-        gap: 6px;
-        font-size: 0.85rem;
-        color: #475569;
-      }
-      input,
-      select {
-        border: 1px solid #cbd5e1;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font: inherit;
-        background: #fff;
-      }
-      .helper {
-        margin: 0;
-        color: #64748b;
-        font-size: 0.78rem;
-      }
-      .table-links {
-        display: grid;
-        gap: 6px;
-      }
-      .table-links .tool {
-        text-align: center;
-      }
-      .link-list {
-        display: grid;
-        gap: 6px;
-      }
-      .viewport-tools {
-        position: absolute;
-        right: 12px;
-        bottom: 12px;
-        z-index: 3;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        background: rgba(255, 255, 255, 0.94);
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 999px;
-        padding: 6px;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
-      }
-      .viewport-tools .tool {
-        padding: 6px 10px;
-        border-radius: 999px;
-        min-width: 34px;
-        text-align: center;
-      }
-      .viewport-tools span {
-        min-width: 54px;
-        text-align: center;
-        font-weight: 700;
-        color: #1f2937;
-        font-size: 0.84rem;
-      }
-      .stage-host {
-        width: 100%;
-        height: 100%;
-        border-radius: 16px;
-        overflow: hidden;
-        background: #f8fafc;
-      }
-      @media (max-width: 980px) {
-        .canvas-wrap {
-          height: calc(100vh - 220px);
-          min-height: 480px;
-        }
-        .toolbox--overlay {
-          max-height: calc(100% - 140px);
-        }
-        .viewport-tools {
-          bottom: 10px;
-          right: 10px;
-          left: 10px;
-          justify-content: center;
-          border-radius: 14px;
-        }
-        .stage-host {
-          min-height: 0;
-        }
-      }
-    `,
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatSelectModule,
   ],
+  templateUrl: './plan-page.component.html',
+  styleUrl: './plan-page.component.css',
 })
 export class PlanPageComponent implements AfterViewInit, OnDestroy {
   @ViewChild('stageHost', { static: true })
@@ -544,7 +398,7 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
       height: item.height,
       cornerRadius: item.type === 'table' ? 12 : 6,
       fill: this.itemFillColor(item),
-      stroke: this.itemBorderColor(item, selected),
+      stroke: this.itemBorderColor(selected),
       strokeWidth: selected ? 3 : 1,
     });
 
@@ -681,7 +535,7 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private itemBorderColor(item: PlanItem, selected: boolean): string {
+  private itemBorderColor(selected: boolean): string {
     return selected ? '#2563eb' : '#94a3b8';
   }
 
@@ -738,18 +592,19 @@ export class PlanPageComponent implements AfterViewInit, OnDestroy {
         return leftHasAnchor ? -1 : 1;
       }
 
-      const leftMinNumber = Math.min(
-        ...left
-          .map((table) => table.tableNumber)
-          .filter((tableNumber): tableNumber is number => tableNumber != null)
-      );
-      const rightMinNumber = Math.min(
-        ...right
-          .map((table) => table.tableNumber)
-          .filter((tableNumber): tableNumber is number => tableNumber != null)
-      );
+      const leftNumbers = left
+        .map((table) => table.tableNumber)
+        .filter((tableNumber): tableNumber is number => tableNumber != null);
+      const rightNumbers = right
+        .map((table) => table.tableNumber)
+        .filter((tableNumber): tableNumber is number => tableNumber != null);
 
-      if (Number.isFinite(leftMinNumber) && Number.isFinite(rightMinNumber)) {
+      const leftMinNumber =
+        leftNumbers.length > 0 ? Math.min(...leftNumbers) : null;
+      const rightMinNumber =
+        rightNumbers.length > 0 ? Math.min(...rightNumbers) : null;
+
+      if (leftMinNumber != null && rightMinNumber != null) {
         if (leftMinNumber !== rightMinNumber) {
           return leftMinNumber - rightMinNumber;
         }

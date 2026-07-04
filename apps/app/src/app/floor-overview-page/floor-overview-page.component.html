@@ -1,0 +1,54 @@
+<section *ngIf="vm$ | async as vm" class="grid gap-4">
+  <mat-card>
+    <mat-card-content
+      class="flex flex-wrap items-center justify-between gap-3 py-4"
+    >
+      <div>
+        <p class="m-0 text-xs uppercase tracking-[0.16em] text-slate-500">
+          Overview
+        </p>
+        <h2 class="m-0 text-xl font-semibold text-slate-900">
+          Room to table mapping
+        </h2>
+      </div>
+
+      <a mat-flat-button color="primary" routerLink="/configure">
+        <mat-icon>settings</mat-icon>
+        Configure
+      </a>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="grid gap-3 lg:grid-cols-3">
+    <mat-card
+      *ngFor="let floor of vm.floors; trackBy: trackByFloor"
+      class="h-full"
+    >
+      <mat-card-header>
+        <mat-card-title>Floor {{ floor.number }}</mat-card-title>
+        <mat-card-subtitle>{{ floor.rooms.length }} rooms</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content class="grid gap-2">
+        <div
+          *ngFor="let room of floor.rooms; trackBy: trackByRoom"
+          class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
+        >
+          <span class="font-medium text-slate-800">Room {{ room.number }}</span>
+
+          <mat-chip>
+            {{
+              tableNumberForRoom(vm.roomToTableMap, room.number)
+                ? 'Table ' + tableNumberForRoom(vm.roomToTableMap, room.number)
+                : 'No table'
+            }}
+          </mat-chip>
+        </div>
+
+        <p *ngIf="!floor.rooms.length" class="m-0 text-sm text-slate-500">
+          No rooms
+        </p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</section>

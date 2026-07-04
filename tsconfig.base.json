@@ -13,7 +13,10 @@
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "paths": {}
+    "paths": {
+      "feature/auth": ["./libs/feature/auth/src/index.ts"],
+      "ui-theme": ["./libs/ui/theme/src/index.ts"]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }

@@ -3,7 +3,6 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
-  "root": "apps/app",
   "sourceRoot": "apps/app/src",
   "tags": [],
   "targets": {
@@ -22,15 +21,18 @@
             "input": "apps/app/public"
           }
         ],
-        "styles": ["apps/app/src/styles.css"]
+        "styles": [
+          "apps/app/src/ui/theme/material-theme.scss",
+          "apps/app/src/styles.css"
+        ]
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
-              "maximumError": "1.2mb"
+              "maximumWarning": "1.6mb",
+              "maximumError": "1.9mb"
             },
             {
               "type": "anyComponentStyle",

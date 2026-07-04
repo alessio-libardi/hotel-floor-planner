@@ -1,4 +1,3 @@
-
 .nx/installation
 .nx/cache
 .nx/workspace-data
@@ -11,3 +10,5 @@ firebase-debug.log
 firebase-data/
 
 __screenshots__/
+
+vitest.config.*.timestamp*
