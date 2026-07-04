@@ -22,8 +22,8 @@
           }
         ],
         "styles": [
-          "apps/app/src/ui/theme/material-theme.scss",
-          "apps/app/src/styles.css"
+          "apps/app/src/styles.css",
+          "libs/ui/theme/src/lib/material-theme.scss"
         ]
       },
       "configurations": {

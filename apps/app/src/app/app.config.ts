@@ -10,12 +10,12 @@ import { provideRouter } from '@angular/router';
 import { appRoutes } from './app.routes';
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { firebaseConfig } from './firebase.config';
+import { firebaseConfig } from '@data-access/api';
 import {
   provideFirebaseUI,
   provideFirebaseUIPolicies,
 } from '@firebase-oss/ui-angular';
-import { initializeUI, providerRedirectStrategy } from '@firebase-oss/ui-core';
+import { initializeUI } from '@firebase-oss/ui-core';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -36,7 +36,6 @@ export const appConfig: ApplicationConfig = {
       console.log('Initializing FirebaseUI with app:', apps);
       return initializeUI({
         app: apps[0],
-        behaviors: [providerRedirectStrategy()],
       });
     }),
     provideFirebaseUIPolicies(() => ({

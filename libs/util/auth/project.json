@@ -1,8 +1,8 @@
 {
-  "name": "feature-auth",
+  "name": "util-auth",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "libs/feature/auth/src",
-  "prefix": "feature-auth",
+  "sourceRoot": "libs/util/auth/src",
+  "prefix": "lib",
   "projectType": "library",
   "tags": [],
   "targets": {
@@ -10,7 +10,7 @@
       "executor": "@nx/vitest:test",
       "outputs": ["{options.reportsDirectory}"],
       "options": {
-        "reportsDirectory": "coverage/libs/feature/auth"
+        "reportsDirectory": "coverage/libs/util/auth"
       }
     },
     "lint": {

@@ -14,8 +14,11 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "paths": {
-      "feature/auth": ["./libs/feature/auth/src/index.ts"],
-      "ui-theme": ["./libs/ui/theme/src/index.ts"]
+      "@data-access/api": ["./libs/data-access/api/src/index.ts"],
+      "@feature/auth": ["./libs/feature/auth/src/index.ts"],
+      "@feature/dashboard": ["./libs/feature/dashboard/src/index.ts"],
+      "@ui/theme": ["./libs/ui/theme/src/index.ts"],
+      "@util/auth": ["./libs/util/auth/src/index.ts"],
     }
   },
   "exclude": ["node_modules", "tmp"]

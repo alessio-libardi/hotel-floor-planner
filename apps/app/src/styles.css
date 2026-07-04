@@ -1,5 +1,7 @@
 @import 'tailwindcss' source('./app');
-@source './feature';
+@source '../../../libs/feature';
+@source '../../../libs/ui';
+
 @import '@firebase-oss/ui-styles/tailwind';
 
 html,
