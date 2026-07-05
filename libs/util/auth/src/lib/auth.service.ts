@@ -7,7 +7,7 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
-import { Observable } from 'rxjs';
+import { Observable, from } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -27,8 +27,8 @@ export class AuthService {
     await signInWithPopup(this.auth, provider);
   }
 
-  async signOut(): Promise<void> {
-    await signOut(this.auth);
+  signOut(): Observable<void> {
+    return from(signOut(this.auth));
   }
 
   requireUser(): User {

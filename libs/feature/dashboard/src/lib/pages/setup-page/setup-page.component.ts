@@ -5,11 +5,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { FloorViewModel, RoomViewModel } from '../floor.models';
-import { FloorStore } from '../floor.store';
+import { FloorViewModel, RoomViewModel } from '../../floor.models';
+import { FloorStore } from '../../floor.store';
 
 @Component({
-  selector: 'app-floor-config-page',
+  selector: 'app-setup-page',
   imports: [
     CommonModule,
     MatButtonModule,
@@ -18,10 +18,10 @@ import { FloorStore } from '../floor.store';
     MatIconModule,
     MatInputModule,
   ],
-  templateUrl: './floor-config-page.component.html',
-  styleUrl: './floor-config-page.component.css',
+  templateUrl: './setup-page.component.html',
+  styleUrls: ['./setup-page.component.css'],
 })
-export class FloorConfigPageComponent implements OnInit {
+export class SetupPageComponent implements OnInit {
   protected readonly floors$;
   protected roomDetailsModal: {
     floorId: string;

@@ -14,12 +14,12 @@ import {
   shareReplay,
   switchMap,
 } from 'rxjs';
-import { FloorViewModel } from '../floor.models';
-import { FloorStore } from '../floor.store';
-import { PlanLayoutStore } from '../plan-layout.store';
+import { FloorViewModel } from '../../floor.models';
+import { FloorStore } from '../../floor.store';
+import { PlanLayoutStore } from '../../plan-layout.store';
 
 @Component({
-  selector: 'app-floor-overview-page',
+  selector: 'app-seating-page',
   imports: [
     CommonModule,
     RouterLink,
@@ -28,10 +28,10 @@ import { PlanLayoutStore } from '../plan-layout.store';
     MatChipsModule,
     MatIconModule,
   ],
-  templateUrl: './floor-overview-page.component.html',
-  styleUrl: './floor-overview-page.component.css',
+  templateUrl: './seating-page.component.html',
+  styleUrls: ['./seating-page.component.css'],
 })
-export class FloorOverviewPageComponent {
+export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
 

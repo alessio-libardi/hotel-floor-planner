@@ -8,10 +8,10 @@ import {
 @Component({
   selector: 'feature-auth-sign-in',
   imports: [GoogleSignInButtonComponent, SignInAuthScreenComponent],
-  templateUrl: './sign-in.component.html',
-  styleUrl: './sign-in.component.css',
+  templateUrl: './sign-in-page.component.html',
+  styleUrl: './sign-in-page.component.css',
 })
-export class SignInComponent {
+export class SignInPageComponent {
   private readonly router = inject(Router);
 
   signIn() {

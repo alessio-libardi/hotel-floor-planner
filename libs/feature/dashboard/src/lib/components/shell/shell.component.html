@@ -1,0 +1,75 @@
+<header
+  class="border-b border-(--mat-sys-outline-variant) bg-(--mat-sys-surface)"
+>
+  <mat-toolbar class="flex items-center gap-3 bg-(--mat-sys-surface) px-4">
+    <h3 class="m-0 text-(--mat-sys-title-medium) font-medium">
+      Hotel al Sorriso
+    </h3>
+
+    <nav class="flex items-center gap-2">
+      <a
+        routerLink="setup"
+        routerLinkActive
+        #setupLink="routerLinkActive"
+        [matButton]="setupLink.isActive ? 'tonal' : ''"
+        color="primary"
+      >
+        Setup
+      </a>
+      <a
+        mat-button
+        routerLink="layout"
+        routerLinkActive
+        #layoutActive="routerLinkActive"
+        [matButton]="layoutActive.isActive ? 'tonal' : ''"
+        color="primary"
+      >
+        Layout
+      </a>
+      <a
+        mat-button
+        routerLink="seating"
+        routerLinkActive
+        #seatingActive="routerLinkActive"
+        [matButton]="seatingActive.isActive ? 'tonal' : ''"
+        color="primary"
+      >
+        Seating
+      </a>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="userMenu"
+      aria-label="Open user menu"
+    >
+      @if (user(); as currentUser) {
+        @if (currentUser.photoURL) {
+          <img
+            [src]="currentUser.photoURL"
+            [alt]="currentUser.displayName ?? 'User avatar'"
+            width="40"
+            height="40"
+          />
+        } @else {
+          <mat-icon>person</mat-icon>
+        }
+      } @else {
+        <mat-icon>person</mat-icon>
+      }
+    </button>
+
+    <mat-menu #userMenu="matMenu">
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>Logout</span>
+      </button>
+    </mat-menu>
+  </mat-toolbar>
+</header>
+
+<main class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4">
+  <router-outlet></router-outlet>
+</main>

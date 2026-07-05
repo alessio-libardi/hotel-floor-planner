@@ -14,9 +14,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import Konva from 'konva';
 import { Subscription, fromEvent } from 'rxjs';
-import { FloorViewModel } from '../floor.models';
-import { FloorStore } from '../floor.store';
-import { PlanItem, PlanLayoutStore } from '../plan-layout.store';
+import { FloorViewModel } from '../../floor.models';
+import { FloorStore } from '../../floor.store';
+import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -25,7 +25,7 @@ const MAX_SCALE = 2.6;
 const SCALE_STEP = 1.15;
 
 @Component({
-  selector: 'app-plan-page',
+  selector: 'app-layout-page',
   imports: [
     CommonModule,
     MatButtonModule,
@@ -34,10 +34,10 @@ const SCALE_STEP = 1.15;
     MatInputModule,
     MatSelectModule,
   ],
-  templateUrl: './plan-page.component.html',
-  styleUrl: './plan-page.component.css',
+  templateUrl: './layout-page.component.html',
+  styleUrls: ['./layout-page.component.css'],
 })
-export class PlanPageComponent implements AfterViewInit, OnDestroy {
+export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   @ViewChild('stageHost', { static: true })
   private readonly stageHost!: ElementRef<HTMLDivElement>;
 
