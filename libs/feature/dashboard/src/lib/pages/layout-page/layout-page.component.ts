@@ -8,31 +8,37 @@ import {
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatToolbarModule } from '@angular/material/toolbar';
 import Konva from 'konva';
-import { Subscription, fromEvent } from 'rxjs';
+import { inject } from '@angular/core';
+import { firstValueFrom, Subscription, fromEvent } from 'rxjs';
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
+import {
+  LayoutItemDialogComponent,
+  LayoutItemDialogData,
+} from './layout-item-dialog.component';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.6;
 const SCALE_STEP = 1.15;
+const FOCUS_PADDING = 64;
+const DOUBLE_CLICK_MS = 320;
+const MIN_CONTAINER_SIZE = GRID_SIZE;
 
 @Component({
   selector: 'app-layout-page',
   imports: [
     CommonModule,
     MatButtonModule,
-    MatFormFieldModule,
+    MatDialogModule,
     MatIconModule,
-    MatInputModule,
-    MatSelectModule,
+    MatToolbarModule,
   ],
   templateUrl: './layout-page.component.html',
   styleUrls: ['./layout-page.component.css'],
@@ -47,7 +53,9 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     roomNumber: number;
     departureDate: string | null;
   }> = [];
-  protected readonly isPanMode = signal(false);
+  protected readonly isPanMode = signal(true);
+
+  private readonly dialog = inject(MatDialog);
 
   private viewScale = 1;
   private viewX = 0;
@@ -56,9 +64,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private stage: Konva.Stage | null = null;
   private gridLayer: Konva.Layer | null = null;
   private itemLayer: Konva.Layer | null = null;
+  private transformer: Konva.Transformer | null = null;
   private resizeSub: Subscription | null = null;
   private storeSub: Subscription | null = null;
   private floorsSub: Subscription | null = null;
+  private hasAutoFocusedInitialItems = false;
+  private lastItemClickId: string | null = null;
+  private lastItemClickAt = 0;
 
   constructor(
     private readonly store: PlanLayoutStore,
@@ -75,8 +87,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       this.renderItems();
     });
 
-    this.storeSub = this.store.items$.subscribe(() => {
+    this.storeSub = this.store.items$.subscribe((items) => {
       this.renderItems();
+
+      if (!this.hasAutoFocusedInitialItems && items.length > 0) {
+        this.hasAutoFocusedInitialItems = true;
+        this.resetView();
+      }
     });
 
     this.resizeSub = fromEvent(window, 'resize').subscribe(() => {
@@ -95,16 +112,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   protected async addTable(): Promise<void> {
     const item = await this.store.addItem('table');
+    this.setPanMode(false);
     this.selectById(item.id);
   }
 
   protected async addColumn(): Promise<void> {
     const item = await this.store.addItem('column');
-    this.selectById(item.id);
-  }
-
-  protected async addLabel(): Promise<void> {
-    const item = await this.store.addItem('label');
+    this.setPanMode(false);
     this.selectById(item.id);
   }
 
@@ -116,6 +130,27 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     await this.store.deleteItem(selected.id);
     this.selectedItem.set(null);
+  }
+
+  protected async openSelectedEditor(): Promise<void> {
+    const selected = this.selectedItem();
+    if (!selected) {
+      return;
+    }
+
+    const dialogRef = this.dialog.open<
+      LayoutItemDialogComponent,
+      LayoutItemDialogData
+    >(LayoutItemDialogComponent, {
+      data: {
+        item: selected,
+        roomOptions: this.roomOptions,
+      },
+    });
+
+    await firstValueFrom(dialogRef.afterClosed());
+
+    this.selectById(selected.id);
   }
 
   protected async updateSelectedText(text: string): Promise<void> {
@@ -244,10 +279,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     return `Floor ${room.floorNumber} - Room ${room.roomNumber}`;
   }
 
-  protected zoomPercentage(): number {
-    return Math.round(this.viewScale * 100);
-  }
-
   protected zoomIn(): void {
     this.zoomBy(SCALE_STEP);
   }
@@ -257,14 +288,49 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected resetView(): void {
-    this.viewScale = 1;
-    this.viewX = 0;
-    this.viewY = 0;
+    if (!this.stage) {
+      return;
+    }
+
+    const bounds = this.getItemsBounds();
+    if (!bounds) {
+      this.viewScale = 1;
+      this.viewX = 0;
+      this.viewY = 0;
+      this.applyViewportTransform();
+      return;
+    }
+
+    const stageWidth = this.stage.width();
+    const stageHeight = this.stage.height();
+
+    if (stageWidth <= 0 || stageHeight <= 0) {
+      return;
+    }
+
+    const paddedWidth = Math.max(bounds.width, 1) + FOCUS_PADDING * 2;
+    const paddedHeight = Math.max(bounds.height, 1) + FOCUS_PADDING * 2;
+
+    const scaleX = stageWidth / paddedWidth;
+    const scaleY = stageHeight / paddedHeight;
+
+    this.viewScale = this.clamp(Math.min(scaleX, scaleY), MIN_SCALE, MAX_SCALE);
+
+    const boundsCenterX = bounds.minX + bounds.width / 2;
+    const boundsCenterY = bounds.minY + bounds.height / 2;
+
+    this.viewX = stageWidth / 2 - boundsCenterX * this.viewScale;
+    this.viewY = stageHeight / 2 - boundsCenterY * this.viewScale;
+
     this.applyViewportTransform();
   }
 
-  protected togglePanMode(): void {
-    this.isPanMode.set(!this.isPanMode());
+  protected setPanMode(enabled: boolean): void {
+    if (this.isPanMode() === enabled) {
+      return;
+    }
+
+    this.isPanMode.set(enabled);
     this.updatePanMode();
     this.renderItems();
   }
@@ -274,14 +340,30 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.stage = new Konva.Stage({
       container: host,
       width: host.clientWidth,
-      height: 560,
+      height: host.clientHeight,
     });
 
     this.gridLayer = new Konva.Layer({ listening: false });
     this.itemLayer = new Konva.Layer();
+    this.transformer = new Konva.Transformer({
+      rotateEnabled: false,
+      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+      keepRatio: true,
+      centeredScaling: false,
+      borderStroke: '#2563eb',
+      borderStrokeWidth: 1,
+      anchorSize: 10,
+      anchorStroke: '#2563eb',
+      anchorFill: '#dbeafe',
+      anchorCornerRadius: 2,
+    });
+    this.transformer.on('transformend', () => {
+      void this.commitContainerResize();
+    });
 
     this.stage.add(this.gridLayer);
     this.stage.add(this.itemLayer);
+    this.itemLayer.add(this.transformer);
 
     this.stage.on('wheel', (event) => {
       event.evt.preventDefault();
@@ -310,6 +392,8 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         this.renderItems();
       }
     });
+
+    this.updatePanMode();
   }
 
   private resizeStage(): void {
@@ -318,7 +402,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     this.stage.width(this.stageHost.nativeElement.clientWidth);
-    this.stage.height(Math.max(440, this.stageHost.nativeElement.clientHeight));
+    this.stage.height(this.stageHost.nativeElement.clientHeight);
     this.applyViewportTransform();
   }
 
@@ -353,10 +437,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private renderItems(): void {
-    if (!this.itemLayer) {
+    if (!this.itemLayer || !this.transformer) {
       return;
     }
 
+    this.transformer.nodes([]);
     this.itemLayer.destroyChildren();
     this.drawTableLinks();
 
@@ -364,6 +449,8 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       const node = this.createNode(item);
       this.itemLayer.add(node);
     }
+
+    this.attachContainerResizeHandle();
 
     this.itemLayer.draw();
   }
@@ -380,6 +467,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         fontSize: 16,
         fill: '#1e293b',
         draggable: !this.isPanMode(),
+        listening: !this.isPanMode(),
       });
 
       this.wireNodeInteractions(text, item.id);
@@ -391,6 +479,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       x: item.x,
       y: item.y,
       draggable: !this.isPanMode(),
+      listening: !this.isPanMode(),
     });
 
     const rect = new Konva.Rect({
@@ -489,10 +578,33 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     node.on('click tap', () => {
+      if (this.isPanMode()) {
+        return;
+      }
+
+      const now = Date.now();
+      const isDoubleClick =
+        this.lastItemClickId === itemId &&
+        now - this.lastItemClickAt <= DOUBLE_CLICK_MS;
+
       this.selectById(itemId);
+
+      if (isDoubleClick) {
+        this.lastItemClickId = null;
+        this.lastItemClickAt = 0;
+        void this.openSelectedEditor();
+        return;
+      }
+
+      this.lastItemClickId = itemId;
+      this.lastItemClickAt = now;
     });
 
     node.on('dragend', () => {
+      if (this.isPanMode()) {
+        return;
+      }
+
       const x = this.snap(node.x());
       const y = this.snap(node.y());
       node.position({ x, y });
@@ -527,6 +639,150 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   private tableCenter(table: PlanItem): [number, number] {
     return [table.x + table.width / 2, table.y + table.height / 2];
+  }
+
+  private attachContainerResizeHandle(): void {
+    if (!this.itemLayer || !this.transformer || this.isPanMode()) {
+      return;
+    }
+
+    const selected = this.selectedItem();
+    if (!selected || selected.type !== 'column') {
+      return;
+    }
+
+    const selectedNode = this.findItemGroupNode(selected.id);
+    if (!(selectedNode instanceof Konva.Group)) {
+      return;
+    }
+
+    selectedNode.off('transform.layout-resize');
+    selectedNode.on('transform.layout-resize', () => {
+      const rect = this.findContainerRect(selectedNode);
+      if (!rect) {
+        return;
+      }
+
+      const nextSize = this.snapSquareSize(
+        Math.max(
+          rect.width() * selectedNode.scaleX(),
+          rect.height() * selectedNode.scaleY()
+        )
+      );
+
+      selectedNode.width(nextSize);
+      selectedNode.height(nextSize);
+      selectedNode.scale({ x: 1, y: 1 });
+
+      rect.width(nextSize);
+      rect.height(nextSize);
+
+      const contentText = selectedNode
+        .getChildren()
+        .find((child) => child instanceof Konva.Text && child.y() > 0);
+      if (contentText instanceof Konva.Text) {
+        contentText.width(nextSize);
+        contentText.y(nextSize / 2 - 8);
+      }
+    });
+
+    this.transformer.nodes([selectedNode]);
+    this.itemLayer.add(this.transformer);
+  }
+
+  private async commitContainerResize(): Promise<void> {
+    if (!this.itemLayer || !this.transformer) {
+      return;
+    }
+
+    const selected = this.selectedItem();
+    if (!selected || selected.type !== 'column') {
+      return;
+    }
+
+    const selectedNode = this.findItemGroupNode(selected.id);
+    if (!(selectedNode instanceof Konva.Group)) {
+      return;
+    }
+
+    const rect = this.findContainerRect(selectedNode);
+    if (!rect) {
+      return;
+    }
+
+    const nextSize = this.snapSquareSize(Math.max(rect.width(), rect.height()));
+    const x = this.snap(selectedNode.x());
+    const y = this.snap(selectedNode.y());
+
+    selectedNode.position({ x, y });
+    selectedNode.width(nextSize);
+    selectedNode.height(nextSize);
+    selectedNode.scale({ x: 1, y: 1 });
+    rect.width(nextSize);
+    rect.height(nextSize);
+
+    await this.store.updateItem(selected.id, {
+      x,
+      y,
+      width: nextSize,
+      height: nextSize,
+    });
+
+    this.selectById(selected.id);
+  }
+
+  private snapSquareSize(value: number): number {
+    return Math.max(MIN_CONTAINER_SIZE, this.snap(value));
+  }
+
+  private findContainerRect(node: Konva.Group): Konva.Rect | null {
+    const rect = node
+      .getChildren()
+      .find((child) => child instanceof Konva.Rect);
+    return rect instanceof Konva.Rect ? rect : null;
+  }
+
+  private findItemGroupNode(itemId: string): Konva.Group | null {
+    if (!this.itemLayer) {
+      return null;
+    }
+
+    const group = this.itemLayer
+      .getChildren()
+      .find((child) => child instanceof Konva.Group && child.id() === itemId);
+
+    return group instanceof Konva.Group ? group : null;
+  }
+
+  private getItemsBounds(): {
+    minX: number;
+    minY: number;
+    width: number;
+    height: number;
+  } | null {
+    const items = this.store.items;
+    if (items.length === 0) {
+      return null;
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const item of items) {
+      minX = Math.min(minX, item.x);
+      minY = Math.min(minY, item.y);
+      maxX = Math.max(maxX, item.x + item.width);
+      maxY = Math.max(maxY, item.y + item.height);
+    }
+
+    return {
+      minX,
+      minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 
   private uniqueLinkIds(linkedTableIds: string[]): string[] {
@@ -733,6 +989,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     const panEnabled = this.isPanMode();
     this.stage.draggable(panEnabled);
     this.stage.container().style.cursor = panEnabled ? 'grab' : 'default';
+
+    if (panEnabled) {
+      this.selectedItem.set(null);
+    }
 
     if (!panEnabled) {
       this.stage.stopDrag();

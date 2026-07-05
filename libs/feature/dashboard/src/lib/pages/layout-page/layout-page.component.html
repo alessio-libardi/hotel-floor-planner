@@ -1,111 +1,54 @@
-<section class="w-full">
-  <div
-    class="relative h-[calc(100vh-190px)] min-h-[600px] overflow-hidden rounded-2xl border border-slate-200 bg-white"
-  >
-    <div #stageHost class="h-full w-full"></div>
+<section class="layout-page">
+  <div class="layout-canvas">
+    <div #stageHost class="layout-stage"></div>
+  </div>
 
-    <aside
-      class="absolute bottom-3 left-3 z-10 grid max-h-[calc(100%-86px)] w-[min(340px,calc(100%-24px))] gap-3 overflow-auto rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur-sm"
-    >
-      <h2 class="m-0 text-base font-semibold text-slate-900">Layout</h2>
+  <mat-toolbar class="layout-toolbar mat-elevation-z8">
+    <div class="layout-toolbar-group">
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Pan mode"
+        [color]="isPanMode() ? 'primary' : undefined"
+        (click)="setPanMode(true)"
+      >
+        <mat-icon>pan_tool</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Edit mode"
+        [color]="!isPanMode() ? 'primary' : undefined"
+        (click)="setPanMode(false)"
+      >
+        <mat-icon>open_with</mat-icon>
+      </button>
+    </div>
 
-      <div class="grid gap-2">
-        <button mat-stroked-button type="button" (click)="addTable()">
-          <mat-icon>table_restaurant</mat-icon>
-          Add table
-        </button>
-        <button mat-stroked-button type="button" (click)="addColumn()">
-          <mat-icon>view_column</mat-icon>
-          Add column
-        </button>
-        <button mat-stroked-button type="button" (click)="addLabel()">
-          <mat-icon>label</mat-icon>
-          Add label
-        </button>
-        <button
-          mat-flat-button
-          color="warn"
-          type="button"
-          (click)="removeSelected()"
-          [disabled]="!selectedItem()"
-        >
-          <mat-icon>delete</mat-icon>
-          Remove selected
-        </button>
-      </div>
+    <span class="layout-toolbar-spacer"></span>
 
-      <div class="grid gap-3" *ngIf="selectedItem() as selected">
-        <ng-container *ngIf="selected.type === 'table'; else genericEditor">
-          <mat-form-field>
-            <mat-label>Room</mat-label>
-            <mat-select
-              [value]="selected.roomNumber ?? ''"
-              (selectionChange)="updateSelectedRoom(($event.value ?? '') + '')"
-            >
-              <mat-option value="">Unassigned</mat-option>
-              <mat-option
-                *ngFor="let room of roomOptions"
-                [value]="room.roomNumber"
-              >
-                {{ roomLabel(room) }}
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
+    <div class="layout-toolbar-group">
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Add table"
+        (click)="addTable()"
+      >
+        <mat-icon>table_restaurant</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Add container"
+        (click)="addColumn()"
+      >
+        <mat-icon>inventory_2</mat-icon>
+      </button>
+    </div>
 
-          <div class="grid gap-2">
-            <p class="m-0 text-xs text-slate-500">
-              Link tables so groups can sit together across rooms.
-            </p>
+    <span class="layout-toolbar-spacer"></span>
 
-            <div
-              class="grid gap-2"
-              *ngIf="availableLinkTargets(selected).length; else noTablesToLink"
-            >
-              <button
-                *ngFor="let table of availableLinkTargets(selected)"
-                mat-stroked-button
-                type="button"
-                [color]="isLinkedToSelected(table.id) ? 'primary' : undefined"
-                (click)="toggleSelectedTableLink(table.id)"
-              >
-                <mat-icon>{{
-                  isLinkedToSelected(table.id) ? 'link_off' : 'link'
-                }}</mat-icon>
-                {{ isLinkedToSelected(table.id) ? 'Unlink' : 'Link' }}
-                {{ tableDisplay(table) }}
-              </button>
-            </div>
-
-            <ng-template #noTablesToLink>
-              <p class="m-0 text-xs text-slate-500">
-                Add at least two tables to create a link.
-              </p>
-            </ng-template>
-          </div>
-        </ng-container>
-
-        <ng-template #genericEditor>
-          <mat-form-field>
-            <mat-label>Text</mat-label>
-            <input
-              matInput
-              type="text"
-              [value]="selected.text"
-              (input)="updateSelectedText(textInput.value)"
-              #textInput
-            />
-          </mat-form-field>
-        </ng-template>
-
-        <p class="m-0 text-xs text-slate-500">
-          Drag items on grid. Use pan mode to move the canvas when zoomed.
-        </p>
-      </div>
-    </aside>
-
-    <div
-      class="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 p-1 shadow-lg"
-    >
+    <div class="layout-toolbar-group">
       <button
         mat-icon-button
         type="button"
@@ -114,9 +57,14 @@
       >
         <mat-icon>remove</mat-icon>
       </button>
-      <span class="min-w-14 text-center text-sm font-semibold text-slate-700"
-        >{{ zoomPercentage() }}%</span
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Reset view"
+        (click)="resetView()"
       >
+        <mat-icon>center_focus_strong</mat-icon>
+      </button>
       <button
         mat-icon-button
         type="button"
@@ -125,16 +73,6 @@
       >
         <mat-icon>add</mat-icon>
       </button>
-      <button mat-button type="button" (click)="resetView()">Reset</button>
-      <button
-        mat-stroked-button
-        type="button"
-        [color]="isPanMode() ? 'primary' : undefined"
-        (click)="togglePanMode()"
-      >
-        <mat-icon>pan_tool</mat-icon>
-        Pan
-      </button>
     </div>
-  </div>
+  </mat-toolbar>
 </section>
