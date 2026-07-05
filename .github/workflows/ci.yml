@@ -99,7 +99,7 @@ jobs:
         run: npm ci
 
       - name: Build app
-        run: npm run build
+        run: npm run build -- -c preview
 
       - name: Deploy
         run: npm run firebase:deploy -- --only hosting,firestore:rules,firestore:indexes

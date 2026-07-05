@@ -11,7 +11,7 @@
       "outputs": [
         "{options.outputPath}"
       ],
-      "defaultConfiguration": "production",
+      "defaultConfiguration": "live",
       "options": {
         "outputPath": "dist/apps/app",
         "browser": "apps/app/src/main.ts",
