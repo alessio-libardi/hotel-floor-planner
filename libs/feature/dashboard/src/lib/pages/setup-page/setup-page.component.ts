@@ -1,12 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
+import { firstValueFrom } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
+import {
+  SetupRoomDialogComponent,
+  SetupRoomDialogResult,
+} from './setup-room-dialog.component';
 
 @Component({
   selector: 'app-setup-page',
@@ -14,22 +20,18 @@ import { FloorStore } from '../../floor.store';
     CommonModule,
     MatButtonModule,
     MatCardModule,
-    MatFormFieldModule,
+    MatDialogModule,
     MatIconModule,
-    MatInputModule,
+    MatListModule,
+    MatMenuModule,
   ],
   templateUrl: './setup-page.component.html',
   styleUrls: ['./setup-page.component.css'],
 })
 export class SetupPageComponent implements OnInit {
   protected readonly floors$;
-  protected roomDetailsModal: {
-    floorId: string;
-    roomId: string;
-    roomNumber: number;
-    arrivalDate: string;
-    departureDate: string;
-  } | null = null;
+
+  private readonly dialog = inject(MatDialog);
 
   constructor(private readonly floorStore: FloorStore) {
     this.floors$ = this.floorStore.floors$;
@@ -55,58 +57,77 @@ export class SetupPageComponent implements OnInit {
     await this.floorStore.removeRoom(floorId, roomId);
   }
 
-  protected openRoomDetails(floorId: string, room: RoomViewModel): void {
-    this.roomDetailsModal = {
-      floorId,
-      roomId: room.id,
-      roomNumber: room.number,
-      arrivalDate: room.arrivalDate ?? '',
-      departureDate: room.departureDate ?? '',
-    };
+  protected floorLabel(floorNumber: number): string {
+    return `${this.ordinal(floorNumber)} floor`;
   }
 
-  protected closeRoomDetails(): void {
-    this.roomDetailsModal = null;
+  protected roomRowBackground(room: RoomViewModel): string | null {
+    const departureDate = room.departureDate;
+
+    if (!departureDate) {
+      return null;
+    }
+
+    const today = this.toDateString(this.today());
+    const tomorrow = this.toDateString(this.tomorrow());
+
+    if (departureDate === tomorrow) {
+      return 'var(--mat-sys-tertiary-container)';
+    }
+
+    if (departureDate <= today) {
+      return 'var(--mat-sys-error-container)';
+    }
+
+    return null;
   }
 
-  protected async saveRoomDetails(
-    arrivalDateValue: string,
-    departureDateValue: string
+  protected roomRowForeground(room: RoomViewModel): string | null {
+    const background = this.roomRowBackground(room);
+
+    if (background === 'var(--mat-sys-error-container)') {
+      return 'var(--mat-sys-on-error-container)';
+    }
+
+    if (background === 'var(--mat-sys-tertiary-container)') {
+      return 'var(--mat-sys-on-tertiary-container)';
+    }
+
+    return null;
+  }
+
+  protected async openRoomDetails(
+    floorId: string,
+    room: RoomViewModel
   ): Promise<void> {
-    if (!this.roomDetailsModal) {
+    const dialogRef = this.dialog.open<
+      SetupRoomDialogComponent,
+      {
+        roomNumber: number;
+        arrivalDate: string | null;
+        departureDate: string | null;
+      },
+      SetupRoomDialogResult
+    >(SetupRoomDialogComponent, {
+      width: 'min(90vw, 640px)',
+      minWidth: '480px',
+      data: {
+        roomNumber: room.number,
+        arrivalDate: room.arrivalDate,
+        departureDate: room.departureDate,
+      },
+    });
+
+    const result = await firstValueFrom(dialogRef.afterClosed());
+
+    if (!result) {
       return;
     }
 
-    const { floorId, roomId } = this.roomDetailsModal;
-    const arrivalDate = arrivalDateValue || null;
-    const departureDate = departureDateValue || null;
-
-    await this.floorStore.updateRoomDetails(floorId, roomId, {
-      arrivalDate,
-      departureDate,
+    await this.floorStore.updateRoomDetails(floorId, room.id, {
+      arrivalDate: result.arrivalDate,
+      departureDate: result.departureDate,
     });
-
-    this.roomDetailsModal = null;
-  }
-
-  protected roomDateRange(room: RoomViewModel): string {
-    if (room.arrivalDate && room.departureDate) {
-      return `${room.arrivalDate} to ${room.departureDate}`;
-    }
-
-    if (room.arrivalDate) {
-      return `Arrives ${room.arrivalDate}`;
-    }
-
-    if (room.departureDate) {
-      return `Leaves ${room.departureDate}`;
-    }
-
-    return 'No stay dates';
-  }
-
-  protected roomCount(floors: FloorViewModel[]): number {
-    return floors.reduce((count, floor) => count + floor.rooms.length, 0);
   }
 
   protected trackByFloor(_index: number, floor: FloorViewModel): string {
@@ -115,5 +136,60 @@ export class SetupPageComponent implements OnInit {
 
   protected trackByRoom(_index: number, room: { id: string }): string {
     return room.id;
+  }
+
+  private ordinal(value: number): string {
+    const mod10 = value % 10;
+    const mod100 = value % 100;
+
+    if (mod10 === 1 && mod100 !== 11) {
+      return `${value}st`;
+    }
+
+    if (mod10 === 2 && mod100 !== 12) {
+      return `${value}nd`;
+    }
+
+    if (mod10 === 3 && mod100 !== 13) {
+      return `${value}rd`;
+    }
+
+    return `${value}th`;
+  }
+
+  private toDateOnly(value: string | null): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    const [year, month, day] = value.split('-').map((entry) => Number(entry));
+
+    if (!year || !month || !day) {
+      return null;
+    }
+
+    const parsed = new Date(year, month - 1, day);
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+
+  private toDateString(value: Date): string {
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, '0');
+    const day = `${value.getDate()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private tomorrow(): Date {
+    const value = this.today();
+    value.setDate(value.getDate() + 1);
+    return value;
+  }
+
+  private today(): Date {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
   }
 }
