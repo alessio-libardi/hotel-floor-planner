@@ -102,4 +102,4 @@ jobs:
         run: npm run build -- -c preview
 
       - name: Deploy
-        run: npm run firebase:deploy -- --only hosting,firestore:rules,firestore:indexes
+        run: npm run firebase:deploy -- --project hotel-floor-planner---preview --only hosting,firestore:rules,firestore:indexes
