@@ -1,4 +1,6 @@
-export const firebaseConfig = {
+import { Environment } from '@util/env';
+
+export const environment: Environment = {
   apiKey: 'AIzaSyDGI5qaI0bdquZiGxZBtjVfj--f4wEvp3c',
   authDomain: 'hotel-floor-planner.firebaseapp.com',
   projectId: 'hotel-floor-planner',

@@ -2,7 +2,7 @@
 @source '../../../libs/feature';
 @source '../../../libs/ui';
 
-@import '@firebase-oss/ui-styles/tailwind';
+@import '../../../libs/ui/theme/src/lib/firebase.css';
 
 html,
 body {

@@ -14,8 +14,8 @@ import {
 } from 'firebase/firestore';
 import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
-import { firestore } from '@data-access/api';
 import { AuthService } from '@util/auth';
+import { Firestore } from '@angular/fire/firestore';
 
 export type PlanItemType = 'table' | 'column' | 'label';
 
@@ -60,6 +60,7 @@ interface PlanItemDoc {
 @Injectable({ providedIn: 'root' })
 export class FloorPlannerApi {
   private readonly auth = inject(AuthService);
+  private readonly firestore = inject(Firestore);
 
   getFloors() {
     return from(this.getFloorsInternal());
@@ -128,7 +129,7 @@ export class FloorPlannerApi {
     this.auth.requireUser();
 
     const floorsSnapshot = await getDocs(
-      query(collection(firestore, 'floors'), orderBy('number', 'asc'))
+      query(collection(this.firestore, 'floors'), orderBy('number', 'asc'))
     );
 
     return floorsSnapshot.docs.map((entry) =>
@@ -141,7 +142,7 @@ export class FloorPlannerApi {
 
     const maxSnapshot = await getDocs(
       query(
-        collection(firestore, 'floors'),
+        collection(this.firestore, 'floors'),
         orderBy('number', 'desc'),
         limit(1)
       )
@@ -149,8 +150,8 @@ export class FloorPlannerApi {
     const maxFloor = maxSnapshot.docs[0]?.data() as FloorDoc | undefined;
     const nextFloorNumber = (maxFloor?.number ?? 0) + 1;
 
-    const result = await runTransaction(firestore, async (transaction) => {
-      const floorRef = doc(collection(firestore, 'floors'));
+    const result = await runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(collection(this.firestore, 'floors'));
       const floorPayload: FloorDoc = {
         number: nextFloorNumber,
         rooms: [],
@@ -169,15 +170,15 @@ export class FloorPlannerApi {
   ): Promise<{ deleted: true }> {
     this.auth.requireUser();
 
-    await deleteDoc(doc(firestore, 'floors', floorId));
+    await deleteDoc(doc(this.firestore, 'floors', floorId));
     return { deleted: true };
   }
 
   private async createRoomInternal(floorId: string): Promise<RoomViewModel> {
     this.auth.requireUser();
 
-    return runTransaction(firestore, async (transaction) => {
-      const floorRef = doc(firestore, 'floors', floorId);
+    return runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(this.firestore, 'floors', floorId);
       const floorSnapshot = await transaction.get(floorRef);
 
       if (!floorSnapshot.exists()) {
@@ -217,8 +218,8 @@ export class FloorPlannerApi {
   ): Promise<RoomViewModel> {
     this.auth.requireUser();
 
-    return runTransaction(firestore, async (transaction) => {
-      const floorRef = doc(firestore, 'floors', floorId);
+    return runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(this.firestore, 'floors', floorId);
       const floorSnapshot = await transaction.get(floorRef);
 
       if (!floorSnapshot.exists()) {
@@ -257,8 +258,8 @@ export class FloorPlannerApi {
   ): Promise<{ deleted: true }> {
     this.auth.requireUser();
 
-    await runTransaction(firestore, async (transaction) => {
-      const floorRef = doc(firestore, 'floors', floorId);
+    await runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(this.firestore, 'floors', floorId);
       const floorSnapshot = await transaction.get(floorRef);
 
       if (!floorSnapshot.exists()) {
@@ -284,8 +285,8 @@ export class FloorPlannerApi {
   ): Promise<RoomViewModel> {
     this.auth.requireUser();
 
-    return runTransaction(firestore, async (transaction) => {
-      const floorRef = doc(firestore, 'floors', floorId);
+    return runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(this.firestore, 'floors', floorId);
       const floorSnapshot = await transaction.get(floorRef);
 
       if (!floorSnapshot.exists()) {
@@ -324,7 +325,7 @@ export class FloorPlannerApi {
 
     const planItemsSnapshot = await getDocs(
       query(
-        collection(firestore, 'planItems'),
+        collection(this.firestore, 'planItems'),
         orderBy('type', 'asc'),
         orderBy('__name__', 'asc')
       )
@@ -369,7 +370,7 @@ export class FloorPlannerApi {
     if (type === 'table') {
       const tableSnapshot = await getDocs(
         query(
-          collection(firestore, 'planItems'),
+          collection(this.firestore, 'planItems'),
           orderBy('tableNumber', 'desc'),
           limit(1)
         )
@@ -381,8 +382,8 @@ export class FloorPlannerApi {
       nextTableNumber = (currentMax?.tableNumber ?? 0) + 1;
     }
 
-    return runTransaction(firestore, async (transaction) => {
-      const itemRef = doc(collection(firestore, 'planItems'));
+    return runTransaction(this.firestore, async (transaction) => {
+      const itemRef = doc(collection(this.firestore, 'planItems'));
       const payload: PlanItemDoc = {
         type,
         x: 48,
@@ -418,7 +419,7 @@ export class FloorPlannerApi {
   ): Promise<PlanItemDto> {
     this.auth.requireUser();
 
-    const itemRef = doc(firestore, 'planItems', itemId);
+    const itemRef = doc(this.firestore, 'planItems', itemId);
     const updatePayload = this.withDefinedValues(patch);
 
     if (Object.keys(updatePayload).length > 0) {
@@ -439,7 +440,7 @@ export class FloorPlannerApi {
   ): Promise<{ deleted: true }> {
     this.auth.requireUser();
 
-    const itemRef = doc(firestore, 'planItems', itemId);
+    const itemRef = doc(this.firestore, 'planItems', itemId);
     const itemSnapshot = await getDoc(itemRef);
     const item = itemSnapshot.exists()
       ? (itemSnapshot.data() as PlanItemDoc)
@@ -450,7 +451,7 @@ export class FloorPlannerApi {
     if (item?.type === 'table') {
       const linkedItemsSnapshot = await getDocs(
         query(
-          collection(firestore, 'planItems'),
+          collection(this.firestore, 'planItems'),
           where('linkedTableIds', 'array-contains', itemId)
         )
       );

@@ -8,7 +8,9 @@
   "targets": {
     "build": {
       "executor": "@angular/build:application",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/app",
@@ -23,11 +25,43 @@
         ],
         "styles": [
           "apps/app/src/styles.css",
-          "libs/ui/theme/src/lib/material-theme.scss"
+          "libs/ui/theme/src/lib/material.scss"
         ]
       },
       "configurations": {
-        "production": {
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true,
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.development.ts"
+            }
+          ]
+        },
+        "preview": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "0.5mb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.preview.ts"
+            }
+          ]
+        },
+        "live": {
           "budgets": [
             {
               "type": "initial",
@@ -40,12 +74,13 @@
               "maximumError": "8kb"
             }
           ],
-          "outputHashing": "all"
-        },
-        "development": {
-          "optimization": false,
-          "extractLicenses": false,
-          "sourceMap": true
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.live.ts"
+            }
+          ]
         }
       }
     },
@@ -54,11 +89,14 @@
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
       "configurations": {
-        "production": {
-          "buildTarget": "app:build:production"
-        },
         "development": {
           "buildTarget": "app:build:development"
+        },
+        "preview": {
+          "buildTarget": "app:build:preview"
+        },
+        "live": {
+          "buildTarget": "app:build:live"
         }
       }
     },
