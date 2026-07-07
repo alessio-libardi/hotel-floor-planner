@@ -1,0 +1,98 @@
+<div mat-dialog-title class="">
+  <span>Edit item</span>
+</div>
+
+<mat-dialog-content class="shape-detail-dialog-content">
+  <mat-form-field appearance="outline">
+    <mat-label>Label</mat-label>
+    <input
+      matInput
+      type="text"
+      [value]="draftLabel"
+      (input)="draftLabel = $any($event.target).value"
+      placeholder="Enter a label"
+    />
+  </mat-form-field>
+
+  @if (selectedItem.type === 'table') {
+    <mat-form-field appearance="outline">
+      <mat-label>Linked room</mat-label>
+      <mat-select
+        [value]="roomSelectionValue()"
+        (selectionChange)="onRoomSelectionChange(($event.value ?? '') + '')"
+      >
+        <mat-option value="">Unassigned</mat-option>
+        @for (group of groupedRooms(); track group.floorNumber) {
+          <mat-optgroup [label]="'Floor ' + group.floorNumber">
+            @for (room of group.rooms; track room.roomId) {
+              <mat-option [value]="room.roomNumber">
+                Room {{ room.roomNumber }}
+              </mat-option>
+            }
+          </mat-optgroup>
+        }
+      </mat-select>
+      <mat-hint>Select a room grouped by floor.</mat-hint>
+    </mat-form-field>
+
+    <div class="shape-detail-dialog-section">
+      <p class="shape-detail-dialog-section-title">Stay period</p>
+
+      @if (canEditRoomDates()) {
+        <p class="shape-detail-dialog-room-summary">
+          {{ linkedRoomSummary() }}
+        </p>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Arrival and leaving date</mat-label>
+          <mat-date-range-input
+            [rangePicker]="picker"
+            [formGroup]="stayRange"
+            [separator]="'-'"
+          >
+            <input matStartDate formControlName="start" placeholder="Arrival" />
+            <input matEndDate formControlName="end" placeholder="Leaving" />
+          </mat-date-range-input>
+          <mat-datepicker-toggle matIconSuffix [for]="picker" />
+          <mat-date-range-picker #picker />
+          @if (attemptedSubmit && hasInvalidDateRange()) {
+            <mat-error
+              >Leaving date cannot be earlier than arrival date.</mat-error
+            >
+          }
+        </mat-form-field>
+      } @else {
+        <p class="shape-detail-dialog-muted">
+          Link a room to edit arrival and leaving dates.
+        </p>
+      }
+    </div>
+
+  }
+
+  <p class="shape-detail-dialog-muted">
+    Changes are saved only when you press Save.
+  </p>
+  @if (saveErrorMessage) {
+    <p class="shape-detail-dialog-error">{{ saveErrorMessage }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" color="warn" (click)="deleteSelected()">
+    Delete
+  </button>
+  <span class="shape-detail-dialog-spacer"></span>
+  <button mat-button type="button" [disabled]="isSaving" (click)="close()">
+    Cancel
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="saveButtonDisabled()"
+    (click)="save()"
+  >
+    Save
+  </button>
+</mat-dialog-actions>

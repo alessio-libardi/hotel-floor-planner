@@ -21,6 +21,7 @@ export interface SetupRoomDialogData {
 export interface SetupRoomDialogResult {
   arrivalDate: string | null;
   departureDate: string | null;
+  deleteRoom?: boolean;
 }
 
 @Component({
@@ -51,6 +52,14 @@ export class SetupRoomDialogComponent {
 
   protected close(): void {
     this.dialogRef.close();
+  }
+
+  protected deleteRoom(): void {
+    this.dialogRef.close({
+      arrivalDate: this.data.arrivalDate,
+      departureDate: this.data.departureDate,
+      deleteRoom: true,
+    });
   }
 
   protected save(): void {

@@ -3,8 +3,9 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatListModule } from '@angular/material/list';
 import {
   combineLatest,
   defer,
@@ -17,16 +18,17 @@ import {
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanLayoutStore } from '../../plan-layout.store';
+import { SeatingTableDialogComponent } from './seating-table-dialog.component';
 
 @Component({
   selector: 'app-seating-page',
   imports: [
     CommonModule,
-    RouterLink,
     MatButtonModule,
     MatCardModule,
-    MatChipsModule,
+    MatDialogModule,
     MatIconModule,
+    MatListModule,
   ],
   templateUrl: './seating-page.component.html',
   styleUrls: ['./seating-page.component.css'],
@@ -34,6 +36,7 @@ import { PlanLayoutStore } from '../../plan-layout.store';
 export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
+  private readonly dialog = inject(MatDialog);
 
   protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
     from(this.floorStore.ensureLoaded()).pipe(
@@ -73,6 +76,19 @@ export class SeatingPageComponent {
 
   protected trackByRoom(_index: number, room: { id: string }): string {
     return room.id;
+  }
+
+  protected openTableDetails(
+    roomNumber: number,
+    tableNumber: number | null
+  ): void {
+    this.dialog.open(SeatingTableDialogComponent, {
+      width: 'min(90vw, 420px)',
+      data: {
+        roomNumber,
+        tableNumber,
+      },
+    });
   }
 
   protected tableNumberForRoom(

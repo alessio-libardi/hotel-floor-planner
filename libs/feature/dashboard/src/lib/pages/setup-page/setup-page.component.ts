@@ -5,7 +5,6 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { MatMenuModule } from '@angular/material/menu';
 import { firstValueFrom } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
@@ -23,7 +22,6 @@ import {
     MatDialogModule,
     MatIconModule,
     MatListModule,
-    MatMenuModule,
   ],
   templateUrl: './setup-page.component.html',
   styleUrls: ['./setup-page.component.css'],
@@ -121,6 +119,11 @@ export class SetupPageComponent implements OnInit {
     const result = await firstValueFrom(dialogRef.afterClosed());
 
     if (!result) {
+      return;
+    }
+
+    if (result.deleteRoom) {
+      await this.floorStore.removeRoom(floorId, room.id);
       return;
     }
 

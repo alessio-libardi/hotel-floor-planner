@@ -7,22 +7,38 @@
     <div class="layout-toolbar-group">
       <button
         mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="isPanMode()"
         type="button"
         aria-label="Pan mode"
-        [color]="isPanMode() ? 'primary' : undefined"
+        [attr.aria-pressed]="isPanMode()"
         (click)="setPanMode(true)"
-      >
-        <mat-icon>pan_tool</mat-icon>
-      </button>
-      <button
-        mat-icon-button
-        type="button"
-        aria-label="Edit mode"
-        [color]="!isPanMode() ? 'primary' : undefined"
-        (click)="setPanMode(false)"
       >
         <mat-icon>open_with</mat-icon>
       </button>
+      <button
+        mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="!isPanMode() && !isLinkMode()"
+        type="button"
+        aria-label="Edit mode"
+        [attr.aria-pressed]="!isPanMode() && !isLinkMode()"
+        (click)="setPanMode(false)"
+      >
+        <mat-icon>drag_indicator</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="isLinkMode()"
+        type="button"
+        aria-label="Link mode"
+        [attr.aria-pressed]="isLinkMode()"
+        (click)="setLinkMode(!isLinkMode())"
+      >
+        <mat-icon>link</mat-icon>
+      </button>
+      <span class="layout-mode-indicator">{{ currentModeLabel() }}</span>
     </div>
 
     <span class="layout-toolbar-spacer"></span>
@@ -75,4 +91,10 @@
       </button>
     </div>
   </mat-toolbar>
+
+  @if (isLinkMode()) {
+    <p class="layout-link-hint">
+      {{ linkModeStatus() || 'Select a table, then click another table to link or unlink.' }}
+    </p>
+  }
 </section>

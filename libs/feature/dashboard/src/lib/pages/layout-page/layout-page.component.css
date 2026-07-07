@@ -48,9 +48,10 @@
   min-height: 0;
   padding: 0.25rem 0.5rem;
 
-  border: 1px solid var(--mat-sys-outline-variant);
+  border: 1px solid color-mix(in oklab, var(--mat-sys-primary) 34%, transparent);
   border-radius: 9999px;
-  background: var(--mat-sys-surface-container-high);
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
   overflow-x: auto;
 }
 
@@ -65,4 +66,43 @@
 .layout-toolbar-spacer {
   flex: 1 1 auto;
   min-width: 0.5rem;
+}
+
+.layout-mode-button {
+  color: var(--mat-sys-on-primary-container);
+  border: 1px solid transparent;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.layout-mode-button--active {
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  border-color: color-mix(in oklab, var(--mat-sys-on-primary) 26%, transparent);
+}
+
+.layout-mode-button:hover {
+  background: color-mix(in oklab, var(--mat-sys-primary) 14%, transparent);
+}
+
+.layout-mode-button--active:hover {
+  background: color-mix(in oklab, var(--mat-sys-primary) 92%, var(--mat-sys-on-primary) 8%);
+}
+
+.layout-mode-button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--mat-sys-primary) 70%, var(--mat-sys-on-primary-container) 30%);
+  outline-offset: 2px;
+}
+
+.layout-mode-indicator {
+  padding-inline: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.layout-link-hint {
+  margin: 0;
+  padding-inline: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--mat-sys-on-surface-variant);
 }

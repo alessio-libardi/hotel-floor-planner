@@ -18,9 +18,10 @@ import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 import {
-  LayoutItemDialogComponent,
-  LayoutItemDialogData,
-} from './layout-item-dialog.component';
+  ShapeDetailDialogComponent,
+  ShapeDetailDialogData,
+  ShapeDetailRoomOption,
+} from './shape-detail-dialog.component';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -28,8 +29,8 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.6;
 const SCALE_STEP = 1.15;
 const FOCUS_PADDING = 64;
-const DOUBLE_CLICK_MS = 320;
 const MIN_CONTAINER_SIZE = GRID_SIZE;
+const MAX_TABLE_LINKS = 2;
 
 @Component({
   selector: 'app-layout-page',
@@ -48,12 +49,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private readonly stageHost!: ElementRef<HTMLDivElement>;
 
   protected readonly selectedItem = signal<PlanItem | null>(null);
-  protected roomOptions: Array<{
-    floorNumber: number;
-    roomNumber: number;
-    departureDate: string | null;
-  }> = [];
+  protected roomOptions: ShapeDetailRoomOption[] = [];
   protected readonly isPanMode = signal(true);
+  protected readonly isLinkMode = signal(false);
+  protected readonly linkModeStatus = signal<string>('');
+
+  private readonly linkSourceTableId = signal<string | null>(null);
 
   private readonly dialog = inject(MatDialog);
 
@@ -69,8 +70,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private storeSub: Subscription | null = null;
   private floorsSub: Subscription | null = null;
   private hasAutoFocusedInitialItems = false;
-  private lastItemClickId: string | null = null;
-  private lastItemClickAt = 0;
 
   constructor(
     private readonly store: PlanLayoutStore,
@@ -139,9 +138,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     const dialogRef = this.dialog.open<
-      LayoutItemDialogComponent,
-      LayoutItemDialogData
-    >(LayoutItemDialogComponent, {
+      ShapeDetailDialogComponent,
+      ShapeDetailDialogData
+    >(ShapeDetailDialogComponent, {
+      width: '600px',
+      maxWidth: '90vw',
       data: {
         item: selected,
         roomOptions: this.roomOptions,
@@ -153,130 +154,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.selectById(selected.id);
   }
 
-  protected async updateSelectedText(text: string): Promise<void> {
-    const selected = this.selectedItem();
-    if (!selected) {
-      return;
+  protected currentModeLabel(): string {
+    if (this.isLinkMode()) {
+      return 'Link mode';
     }
 
-    await this.store.updateItem(selected.id, { text });
-    this.selectedItem.set({ ...selected, text });
-  }
-
-  protected async updateSelectedRoom(roomNumberValue: string): Promise<void> {
-    const selected = this.selectedItem();
-    if (!selected || selected.type !== 'table') {
-      return;
-    }
-
-    const roomNumber = roomNumberValue ? Number(roomNumberValue) : null;
-
-    if (roomNumber === selected.roomNumber) {
-      return;
-    }
-
-    const existing = roomNumber
-      ? this.store.items.find(
-          (item) =>
-            item.type === 'table' &&
-            item.id !== selected.id &&
-            item.roomNumber === roomNumber
-        )
-      : undefined;
-
-    if (existing) {
-      await this.store.updateItem(existing.id, { roomNumber: null, text: '' });
-    }
-
-    await this.store.updateItem(selected.id, {
-      roomNumber,
-      text: roomNumber ? `Room ${roomNumber}` : '',
-    });
-
-    this.selectedItem.set({
-      ...selected,
-      roomNumber,
-      text: roomNumber ? `Room ${roomNumber}` : '',
-    });
-  }
-
-  protected availableLinkTargets(selected: PlanItem): PlanItem[] {
-    if (selected.type !== 'table') {
-      return [];
-    }
-
-    return this.store.items
-      .filter((item) => item.type === 'table' && item.id !== selected.id)
-      .sort((left, right) => {
-        const leftNumber = left.tableNumber ?? Number.MAX_SAFE_INTEGER;
-        const rightNumber = right.tableNumber ?? Number.MAX_SAFE_INTEGER;
-
-        if (leftNumber !== rightNumber) {
-          return leftNumber - rightNumber;
-        }
-
-        return left.id.localeCompare(right.id);
-      });
-  }
-
-  protected isLinkedToSelected(targetTableId: string): boolean {
-    const selected = this.selectedItem();
-    return selected?.type === 'table'
-      ? selected.linkedTableIds.includes(targetTableId)
-      : false;
-  }
-
-  protected tableDisplay(table: PlanItem): string {
-    return table.tableNumber ? `Table ${table.tableNumber}` : 'Table';
-  }
-
-  protected async toggleSelectedTableLink(
-    targetTableId: string
-  ): Promise<void> {
-    const selected = this.selectedItem();
-
-    if (!selected || selected.type !== 'table') {
-      return;
-    }
-
-    const target = this.store.items.find(
-      (item) => item.id === targetTableId && item.type === 'table'
-    );
-
-    if (!target) {
-      return;
-    }
-
-    const shouldUnlink = selected.linkedTableIds.includes(targetTableId);
-    const nextSelectedLinks = shouldUnlink
-      ? selected.linkedTableIds.filter((entry) => entry !== targetTableId)
-      : [...selected.linkedTableIds, targetTableId];
-    const nextTargetLinks = shouldUnlink
-      ? target.linkedTableIds.filter((entry) => entry !== selected.id)
-      : [...target.linkedTableIds, selected.id];
-
-    await this.store.updateItem(selected.id, {
-      linkedTableIds: this.uniqueLinkIds(nextSelectedLinks),
-    });
-    await this.store.updateItem(target.id, {
-      linkedTableIds: this.uniqueLinkIds(nextTargetLinks),
-    });
-
-    await this.syncLinkedTableNumbers(selected.id);
-
-    const refreshedSelected = this.store.items.find(
-      (item) => item.id === selected.id
-    );
-    if (refreshedSelected) {
-      this.selectedItem.set(refreshedSelected);
-    }
-  }
-
-  protected roomLabel(room: {
-    floorNumber: number;
-    roomNumber: number;
-  }): string {
-    return `Floor ${room.floorNumber} - Room ${room.roomNumber}`;
+    return this.isPanMode() ? 'Pan mode' : 'Edit mode';
   }
 
   protected zoomIn(): void {
@@ -326,12 +209,37 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected setPanMode(enabled: boolean): void {
-    if (this.isPanMode() === enabled) {
+    if (this.isPanMode() === enabled && (!enabled || !this.isLinkMode())) {
       return;
     }
 
+    if (enabled) {
+      this.isLinkMode.set(false);
+      this.linkSourceTableId.set(null);
+      this.linkModeStatus.set('');
+    }
+
     this.isPanMode.set(enabled);
-    this.updatePanMode();
+    this.updateCanvasInteractionMode();
+    this.renderItems();
+  }
+
+  protected setLinkMode(enabled: boolean): void {
+    if (this.isLinkMode() === enabled) {
+      return;
+    }
+
+    this.isLinkMode.set(enabled);
+
+    if (enabled) {
+      this.isPanMode.set(false);
+      this.linkModeStatus.set('Select the first table to start linking.');
+    } else {
+      this.linkSourceTableId.set(null);
+      this.linkModeStatus.set('');
+    }
+
+    this.updateCanvasInteractionMode();
     this.renderItems();
   }
 
@@ -389,11 +297,17 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.stage.on('click', (event) => {
       if (event.target === this.stage) {
         this.selectedItem.set(null);
+
+        if (this.isLinkMode()) {
+          this.linkSourceTableId.set(null);
+          this.linkModeStatus.set('Select a table to start linking.');
+        }
+
         this.renderItems();
       }
     });
 
-    this.updatePanMode();
+    this.updateCanvasInteractionMode();
   }
 
   private resizeStage(): void {
@@ -534,6 +448,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     const tablesById = new Map(tables.map((table) => [table.id, table]));
     const renderedLinks = new Set<string>();
     const selectedId = this.selectedItem()?.id;
+    const linkSourceId = this.linkSourceTableId();
 
     for (const table of tables) {
       for (const linkedId of table.linkedTableIds) {
@@ -553,12 +468,19 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         const [startX, startY] = this.tableCenter(table);
         const [endX, endY] = this.tableCenter(linkedTable);
         const highlighted =
-          selectedId === table.id || selectedId === linkedTable.id;
+          selectedId === table.id ||
+          selectedId === linkedTable.id ||
+          linkSourceId === table.id ||
+          linkSourceId === linkedTable.id;
 
         this.itemLayer.add(
           new Konva.Line({
             points: [startX, startY, endX, endY],
-            stroke: highlighted ? '#2563eb' : '#94a3b8',
+            stroke: highlighted
+              ? this.isLinkMode()
+                ? '#f59e0b'
+                : '#2563eb'
+              : '#94a3b8',
             strokeWidth: highlighted ? 4 : 2,
             dash: [8, 6],
             lineCap: 'round',
@@ -570,38 +492,44 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private wireNodeInteractions(node: Konva.Node, itemId: string): void {
-    if (!this.isPanMode()) {
+    let draggedInCurrentGesture = false;
+
+    if (!this.isPanMode() && !this.isLinkMode()) {
       node.dragBoundFunc((position) => ({
         x: this.snap(position.x),
         y: this.snap(position.y),
       }));
     }
 
+    node.on('dragstart', () => {
+      if (this.isPanMode()) {
+        return;
+      }
+
+      draggedInCurrentGesture = true;
+    });
+
     node.on('click tap', () => {
       if (this.isPanMode()) {
         return;
       }
 
-      const now = Date.now();
-      const isDoubleClick =
-        this.lastItemClickId === itemId &&
-        now - this.lastItemClickAt <= DOUBLE_CLICK_MS;
-
-      this.selectById(itemId);
-
-      if (isDoubleClick) {
-        this.lastItemClickId = null;
-        this.lastItemClickAt = 0;
-        void this.openSelectedEditor();
+      if (this.isLinkMode()) {
+        void this.handleLinkModeNodeClick(itemId);
         return;
       }
 
-      this.lastItemClickId = itemId;
-      this.lastItemClickAt = now;
+      if (draggedInCurrentGesture) {
+        draggedInCurrentGesture = false;
+        return;
+      }
+
+      this.selectById(itemId);
+      void this.openSelectedEditor();
     });
 
     node.on('dragend', () => {
-      if (this.isPanMode()) {
+      if (this.isPanMode() || this.isLinkMode()) {
         return;
       }
 
@@ -610,18 +538,18 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       node.position({ x, y });
       void this.store.updateItem(itemId, { x, y });
       this.selectById(itemId);
+      draggedInCurrentGesture = false;
     });
   }
 
-  private extractRooms(floors: FloorViewModel[]): Array<{
-    floorNumber: number;
-    roomNumber: number;
-    departureDate: string | null;
-  }> {
+  private extractRooms(floors: FloorViewModel[]): ShapeDetailRoomOption[] {
     return floors.flatMap((floor) =>
       floor.rooms.map((room) => ({
+        floorId: floor.id,
         floorNumber: floor.number,
+        roomId: room.id,
         roomNumber: room.number,
+        arrivalDate: room.arrivalDate,
         departureDate: room.departureDate,
       }))
     );
@@ -981,20 +909,115 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.stage.batchDraw();
   }
 
-  private updatePanMode(): void {
+  private async handleLinkModeNodeClick(itemId: string): Promise<void> {
+    const item = this.store.items.find((entry) => entry.id === itemId);
+
+    if (!item || item.type !== 'table') {
+      this.linkModeStatus.set('Only tables can be linked.');
+      return;
+    }
+
+    const sourceId = this.linkSourceTableId();
+
+    if (!sourceId) {
+      this.linkSourceTableId.set(item.id);
+      this.selectedItem.set(item);
+      this.linkModeStatus.set(
+        'Select another table to link or unlink with this source.'
+      );
+      this.renderItems();
+      return;
+    }
+
+    if (sourceId === item.id) {
+      this.linkSourceTableId.set(null);
+      this.linkModeStatus.set('Source cleared. Select a table to start again.');
+      this.renderItems();
+      return;
+    }
+
+    await this.toggleLinkBetweenTables(sourceId, item.id);
+  }
+
+  private async toggleLinkBetweenTables(
+    sourceTableId: string,
+    targetTableId: string
+  ): Promise<void> {
+    const source = this.store.items.find(
+      (item) => item.id === sourceTableId && item.type === 'table'
+    );
+    const target = this.store.items.find(
+      (item) => item.id === targetTableId && item.type === 'table'
+    );
+
+    if (!source || !target) {
+      this.linkModeStatus.set('Could not find one of the selected tables.');
+      return;
+    }
+
+    const currentlyLinked = source.linkedTableIds.includes(target.id);
+
+    if (!currentlyLinked) {
+      if (source.linkedTableIds.length >= MAX_TABLE_LINKS) {
+        this.linkModeStatus.set('Source table already has 2 linked tables.');
+        return;
+      }
+
+      if (target.linkedTableIds.length >= MAX_TABLE_LINKS) {
+        this.linkModeStatus.set('Target table already has 2 linked tables.');
+        return;
+      }
+    }
+
+    const nextSourceLinks = currentlyLinked
+      ? source.linkedTableIds.filter((entry) => entry !== target.id)
+      : [...source.linkedTableIds, target.id];
+    const nextTargetLinks = currentlyLinked
+      ? target.linkedTableIds.filter((entry) => entry !== source.id)
+      : [...target.linkedTableIds, source.id];
+
+    await this.store.updateItem(source.id, {
+      linkedTableIds: this.uniqueLinkIds(nextSourceLinks),
+    });
+    await this.store.updateItem(target.id, {
+      linkedTableIds: this.uniqueLinkIds(nextTargetLinks),
+    });
+
+    await this.syncLinkedTableNumbers(source.id);
+
+    const refreshedSource = this.store.items.find(
+      (item) => item.id === source.id
+    );
+    if (refreshedSource) {
+      this.selectedItem.set(refreshedSource);
+    }
+
+    this.linkSourceTableId.set(source.id);
+    this.linkModeStatus.set(
+      currentlyLinked ? 'Tables unlinked.' : 'Tables linked.'
+    );
+    this.renderItems();
+  }
+
+  private updateCanvasInteractionMode(): void {
     if (!this.stage) {
       return;
     }
 
     const panEnabled = this.isPanMode();
+    const linkMode = this.isLinkMode();
     this.stage.draggable(panEnabled);
-    this.stage.container().style.cursor = panEnabled ? 'grab' : 'default';
+    this.stage.container().style.cursor = panEnabled
+      ? 'grab'
+      : linkMode
+        ? 'crosshair'
+        : 'default';
 
     if (panEnabled) {
       this.selectedItem.set(null);
     }
 
-    if (!panEnabled) {
+    if (!panEnabled || linkMode) {
       this.stage.stopDrag();
     }
   }
