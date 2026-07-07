@@ -19,7 +19,9 @@ export interface SeatingTableDialogData {
   styleUrls: ['./seating-table-dialog.component.css'],
 })
 export class SeatingTableDialogComponent {
-  private readonly dialogRef = inject(MatDialogRef<SeatingTableDialogComponent>);
+  private readonly dialogRef = inject(
+    MatDialogRef<SeatingTableDialogComponent>
+  );
 
   protected readonly data = inject<SeatingTableDialogData>(MAT_DIALOG_DATA);
 
