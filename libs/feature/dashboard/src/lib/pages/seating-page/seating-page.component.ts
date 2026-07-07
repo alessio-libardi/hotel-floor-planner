@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -18,7 +17,17 @@ import {
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanLayoutStore } from '../../plan-layout.store';
+import {
+  getRoomDepartureStatus,
+  TOMORROW_HIGHLIGHT_BACKGROUND,
+  TOMORROW_HIGHLIGHT_FOREGROUND,
+} from '../../room-departure-status';
 import { SeatingTableDialogComponent } from './seating-table-dialog.component';
+
+interface RoomTableAssignment {
+  tableNumber: string;
+  note: string;
+}
 
 @Component({
   selector: 'app-seating-page',
@@ -46,7 +55,7 @@ export class SeatingPageComponent {
 
   protected readonly roomToTableMap$ = this.planStore.items$.pipe(
     map((items) => {
-      const roomToTableMap = new Map<number, number>();
+      const roomToTableMap = new Map<number, RoomTableAssignment>();
 
       for (const item of items) {
         if (
@@ -57,7 +66,10 @@ export class SeatingPageComponent {
           continue;
         }
 
-        roomToTableMap.set(item.roomNumber, item.tableNumber);
+        roomToTableMap.set(item.roomNumber, {
+          tableNumber: item.tableNumber,
+          note: item.text,
+        });
       }
 
       return roomToTableMap;
@@ -78,23 +90,55 @@ export class SeatingPageComponent {
     return room.id;
   }
 
-  protected openTableDetails(
-    roomNumber: number,
-    tableNumber: number | null
-  ): void {
+  protected openTableDetails(roomNumber: number, note: string | null): void {
     this.dialog.open(SeatingTableDialogComponent, {
       width: 'min(90vw, 420px)',
       data: {
         roomNumber,
-        tableNumber,
+        note,
       },
     });
   }
 
   protected tableNumberForRoom(
-    roomToTableMap: Map<number, number>,
+    roomToTableMap: Map<number, RoomTableAssignment>,
     roomNumber: number
-  ): number | null {
-    return roomToTableMap.get(roomNumber) ?? null;
+  ): string | null {
+    return roomToTableMap.get(roomNumber)?.tableNumber ?? null;
+  }
+
+  protected noteForRoom(
+    roomToTableMap: Map<number, RoomTableAssignment>,
+    roomNumber: number
+  ): string | null {
+    return roomToTableMap.get(roomNumber)?.note ?? null;
+  }
+
+  protected roomRowBackground(departureDate: string | null): string | null {
+    const status = getRoomDepartureStatus(departureDate);
+
+    if (status === 'tomorrow') {
+      return TOMORROW_HIGHLIGHT_BACKGROUND;
+    }
+
+    if (status === 'expired') {
+      return 'var(--mat-sys-error-container)';
+    }
+
+    return null;
+  }
+
+  protected roomRowForeground(departureDate: string | null): string | null {
+    const status = getRoomDepartureStatus(departureDate);
+
+    if (status === 'tomorrow') {
+      return TOMORROW_HIGHLIGHT_FOREGROUND;
+    }
+
+    if (status === 'expired') {
+      return 'var(--mat-sys-on-error-container)';
+    }
+
+    return null;
   }
 }

@@ -16,6 +16,11 @@ import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
 import { AuthService } from '@util/auth';
 import { Firestore } from '@angular/fire/firestore';
+import {
+  compareTableNumbers,
+  nextGeneratedTableNumber,
+  normalizeTableNumber,
+} from './table-number';
 
 export type PlanItemType = 'table' | 'column' | 'label';
 
@@ -27,7 +32,7 @@ export interface PlanItemDto {
   width: number;
   height: number;
   text: string;
-  tableNumber: number | null;
+  tableNumber: string | null;
   roomNumber: number | null;
   linkedTableIds: string[];
 }
@@ -52,7 +57,7 @@ interface PlanItemDoc {
   width: number;
   height: number;
   text: string;
-  tableNumber: number | null;
+  tableNumber: string | null;
   roomNumber: number | null;
   linkedTableIds: string[];
 }
@@ -353,7 +358,7 @@ export class FloorPlannerApi {
       }
 
       if (left.tableNumber !== right.tableNumber) {
-        return left.tableNumber - right.tableNumber;
+        return compareTableNumbers(left.tableNumber, right.tableNumber);
       }
 
       return left.id.localeCompare(right.id);
@@ -365,21 +370,19 @@ export class FloorPlannerApi {
   ): Promise<PlanItemDto> {
     this.auth.requireUser();
 
-    let nextTableNumber: number | null = null;
+    let nextTableNumber: string | null = null;
 
     if (type === 'table') {
       const tableSnapshot = await getDocs(
-        query(
-          collection(this.firestore, 'planItems'),
-          orderBy('tableNumber', 'desc'),
-          limit(1)
-        )
+        collection(this.firestore, 'planItems')
       );
 
-      const currentMax = tableSnapshot.docs[0]?.data() as
-        | PlanItemDoc
-        | undefined;
-      nextTableNumber = (currentMax?.tableNumber ?? 0) + 1;
+      nextTableNumber = nextGeneratedTableNumber(
+        tableSnapshot.docs
+          .map((entry) => entry.data() as PlanItemDoc)
+          .filter((item) => item.type === 'table')
+          .map((item) => normalizeTableNumber(item.tableNumber))
+      );
     }
 
     return runTransaction(this.firestore, async (transaction) => {
@@ -497,7 +500,7 @@ export class FloorPlannerApi {
       width: item.width,
       height: item.height,
       text: item.text,
-      tableNumber: item.tableNumber,
+      tableNumber: normalizeTableNumber(item.tableNumber),
       roomNumber: item.roomNumber,
       linkedTableIds: item.linkedTableIds ?? [],
     };

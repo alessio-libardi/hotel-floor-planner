@@ -1,11 +1,16 @@
-<h2 mat-dialog-title>Room {{ data.roomNumber }}</h2>
+<h2 mat-dialog-title>Note</h2>
 
 <mat-dialog-content>
-  @if (data.tableNumber !== null) {
-    <p>Table {{ data.tableNumber }}</p>
-  } @else {
-    <p>No table assigned</p>
-  }
+  <mat-form-field appearance="outline" class="seating-table-dialog-note-field">
+    <mat-label>Table note</mat-label>
+    <textarea
+      matInput
+      rows="4"
+      [value]="note"
+      placeholder="No note"
+      readonly
+    ></textarea>
+  </mat-form-field>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">

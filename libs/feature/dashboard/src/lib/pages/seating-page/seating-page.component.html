@@ -18,22 +18,29 @@
             mat-list-item
             *ngFor="let room of floor.rooms; trackBy: trackByRoom"
             type="button"
+            [style.background-color]="roomRowBackground(room.departureDate)"
+            [style.color]="roomRowForeground(room.departureDate)"
             (click)="
               openTableDetails(
                 room.number,
-                tableNumberForRoom(vm.roomToTableMap, room.number)
+                noteForRoom(vm.roomToTableMap, room.number)
               )
             "
           >
             <div matListItemTitle>Room {{ room.number }}</div>
-            <div matListItemLine>
-              {{
-                tableNumberForRoom(vm.roomToTableMap, room.number)
-                  ? 'Table ' +
-                    tableNumberForRoom(vm.roomToTableMap, room.number)
-                  : 'No table'
-              }}
-            </div>
+            <span matListItemMeta class="seating-room-meta">
+              @if (
+                tableNumberForRoom(vm.roomToTableMap, room.number);
+                as tableNumber
+              ) {
+                <span class="seating-room-table-chip">
+                  <mat-icon aria-hidden="true">table_restaurant</mat-icon>
+                  <span>{{ tableNumber }}</span>
+                </span>
+              } @else {
+                <span class="seating-room-table-empty">No table</span>
+              }
+            </span>
           </button>
 
           <mat-list-item *ngIf="!floor.rooms.length">

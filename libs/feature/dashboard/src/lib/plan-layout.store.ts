@@ -6,6 +6,7 @@ import {
   PlanItemDto,
   PlanItemType,
 } from './floor-planner.api';
+import { nextGeneratedTableNumber, normalizeTableNumber } from './table-number';
 
 export interface PlanItem {
   id: string;
@@ -15,7 +16,7 @@ export interface PlanItem {
   width: number;
   height: number;
   text: string;
-  tableNumber: number | null;
+  tableNumber: string | null;
   roomNumber: number | null;
   linkedTableIds: string[];
 }
@@ -113,16 +114,18 @@ export class PlanLayoutStore {
       width: Number(item.width),
       height: Number(item.height),
       text: String(item.text ?? ''),
-      tableNumber: item.tableNumber,
+      tableNumber: normalizeTableNumber(item.tableNumber),
       roomNumber: item.roomNumber,
       linkedTableIds: item.linkedTableIds ?? [],
     };
   }
 
   private createOptimisticItem(type: PlanItemType): PlanItem {
-    const highestTableNumber = this.items
-      .filter((item) => item.type === 'table' && item.tableNumber != null)
-      .reduce((max, item) => Math.max(max, item.tableNumber ?? 0), 0);
+    const nextTableNumber = nextGeneratedTableNumber(
+      this.items
+        .filter((item) => item.type === 'table')
+        .map((item) => item.tableNumber)
+    );
 
     return {
       id: `tmp_item_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -132,7 +135,7 @@ export class PlanLayoutStore {
       width: type === 'label' ? 120 : 74,
       height: type === 'label' ? 28 : 74,
       text: type === 'column' ? 'Column' : '',
-      tableNumber: type === 'table' ? highestTableNumber + 1 : null,
+      tableNumber: type === 'table' ? nextTableNumber : null,
       roomNumber: null,
       linkedTableIds: [],
     };

@@ -9,6 +9,11 @@ import { firstValueFrom } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import {
+  getRoomDepartureStatus,
+  TOMORROW_HIGHLIGHT_BACKGROUND,
+  TOMORROW_HIGHLIGHT_FOREGROUND,
+} from '../../room-departure-status';
+import {
   SetupRoomDialogComponent,
   SetupRoomDialogResult,
 } from './setup-room-dialog.component';
@@ -60,20 +65,13 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected roomRowBackground(room: RoomViewModel): string | null {
-    const departureDate = room.departureDate;
+    const status = getRoomDepartureStatus(room.departureDate);
 
-    if (!departureDate) {
-      return null;
+    if (status === 'tomorrow') {
+      return TOMORROW_HIGHLIGHT_BACKGROUND;
     }
 
-    const today = this.toDateString(this.today());
-    const tomorrow = this.toDateString(this.tomorrow());
-
-    if (departureDate === tomorrow) {
-      return 'var(--mat-sys-tertiary-container)';
-    }
-
-    if (departureDate <= today) {
+    if (status === 'expired') {
       return 'var(--mat-sys-error-container)';
     }
 
@@ -81,14 +79,14 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected roomRowForeground(room: RoomViewModel): string | null {
-    const background = this.roomRowBackground(room);
+    const status = getRoomDepartureStatus(room.departureDate);
 
-    if (background === 'var(--mat-sys-error-container)') {
+    if (status === 'expired') {
       return 'var(--mat-sys-on-error-container)';
     }
 
-    if (background === 'var(--mat-sys-tertiary-container)') {
-      return 'var(--mat-sys-on-tertiary-container)';
+    if (status === 'tomorrow') {
+      return TOMORROW_HIGHLIGHT_FOREGROUND;
     }
 
     return null;
@@ -158,41 +156,5 @@ export class SetupPageComponent implements OnInit {
     }
 
     return `${value}th`;
-  }
-
-  private toDateOnly(value: string | null): Date | null {
-    if (!value) {
-      return null;
-    }
-
-    const [year, month, day] = value.split('-').map((entry) => Number(entry));
-
-    if (!year || !month || !day) {
-      return null;
-    }
-
-    const parsed = new Date(year, month - 1, day);
-    parsed.setHours(0, 0, 0, 0);
-    return parsed;
-  }
-
-  private toDateString(value: Date): string {
-    const year = value.getFullYear();
-    const month = `${value.getMonth() + 1}`.padStart(2, '0');
-    const day = `${value.getDate()}`.padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-  }
-
-  private tomorrow(): Date {
-    const value = this.today();
-    value.setDate(value.getDate() + 1);
-    return value;
-  }
-
-  private today(): Date {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return now;
   }
 }

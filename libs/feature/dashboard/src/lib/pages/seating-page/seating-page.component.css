@@ -1,3 +1,35 @@
 :host {
   display: block;
 }
+
+.seating-room-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 6rem;
+}
+
+.seating-room-table-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  color: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.seating-room-table-chip mat-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+.seating-room-table-empty {
+  color: color-mix(in oklab, currentColor 72%, transparent);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}

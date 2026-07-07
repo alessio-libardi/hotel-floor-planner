@@ -18,6 +18,16 @@ import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 import {
+  getRoomDepartureStatus,
+  RoomDepartureStatus,
+  TOMORROW_HIGHLIGHT_BACKGROUND,
+  TOMORROW_HIGHLIGHT_FOREGROUND,
+} from '../../room-departure-status';
+import {
+  compareTableNumbers,
+  nextGeneratedTableNumber,
+} from '../../table-number';
+import {
   ShapeDetailDialogComponent,
   ShapeDetailDialogData,
   ShapeDetailRoomOption,
@@ -407,7 +417,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     group.add(rect);
 
-    if (item.type === 'table' || item.type === 'column') {
+    if (item.type === 'column') {
       group.add(
         new Konva.Text({
           x: 0,
@@ -416,19 +426,59 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
           align: 'center',
           text: item.text,
           fontSize: 14,
-          fill: '#0f172a',
+          fill: this.itemTextColor(item),
+          listening: false,
+        })
+      );
+    }
+
+    if (item.type === 'table') {
+      group.add(
+        new Konva.Text({
+          x: 8,
+          y: 7,
+          text: item.tableNumber ?? '?',
+          fontSize: 11,
+          fontStyle: 'bold',
+          fill: this.itemTextColor(item),
           listening: false,
         })
       );
 
-      if (item.type === 'table') {
+      group.add(
+        new Konva.Text({
+          x: 0,
+          y: item.height / 2 - 8,
+          width: item.width,
+          align: 'center',
+          text: this.tableRoomLabel(item.roomNumber),
+          fontSize: 13,
+          fill: this.itemTextColor(item),
+          listening: false,
+        })
+      );
+
+      if (this.hasTableNote(item)) {
+        group.add(
+          new Konva.Circle({
+            x: item.width - 12,
+            y: 12,
+            radius: 7,
+            fill: '#f59e0b',
+            listening: false,
+          })
+        );
+
         group.add(
           new Konva.Text({
-            x: 6,
+            x: item.width - 17,
             y: 6,
-            text: item.tableNumber ? `T${item.tableNumber}` : 'T?',
+            width: 10,
+            align: 'center',
+            text: '!',
             fontSize: 11,
-            fill: '#1d4ed8',
+            fontStyle: 'bold',
+            fill: '#ffffff',
             listening: false,
           })
         );
@@ -724,32 +774,47 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private itemFillColor(item: PlanItem): string {
-    if (item.type === 'table' && this.isAssignedRoomEmpty(item.roomNumber)) {
-      return '#fee2e2';
+    if (item.type === 'table') {
+      const status = this.assignedRoomStatus(item.roomNumber);
+
+      if (status === 'expired') {
+        return '#fee2e2';
+      }
+
+      if (status === 'tomorrow') {
+        return TOMORROW_HIGHLIGHT_BACKGROUND;
+      }
     }
 
     return item.type === 'table' ? '#dbeafe' : '#f1f5f9';
   }
 
-  private isAssignedRoomEmpty(roomNumber: number | null): boolean {
+  private itemTextColor(item: PlanItem): string {
+    if (item.type !== 'table') {
+      return '#0f172a';
+    }
+
+    const status = this.assignedRoomStatus(item.roomNumber);
+    return status === 'tomorrow' ? TOMORROW_HIGHLIGHT_FOREGROUND : '#0f172a';
+  }
+
+  private tableRoomLabel(roomNumber: number | null): string {
+    return roomNumber != null ? `Room ${roomNumber}` : 'No room';
+  }
+
+  private hasTableNote(item: PlanItem): boolean {
+    return item.type === 'table' && item.text.trim().length > 0;
+  }
+
+  private assignedRoomStatus(roomNumber: number | null): RoomDepartureStatus {
     if (roomNumber == null) {
-      return false;
+      return 'none';
     }
 
     const room = this.roomOptions.find(
       (entry) => entry.roomNumber === roomNumber
     );
-    if (!room?.departureDate) {
-      return false;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const departureDate = new Date(room.departureDate);
-    departureDate.setHours(0, 0, 0, 0);
-
-    return departureDate <= today;
+    return getRoomDepartureStatus(room?.departureDate ?? null);
   }
 
   private async syncLinkedTableNumbers(anchorTableId: string): Promise<void> {
@@ -759,13 +824,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     const components = this.getTableLinkComponents(tables);
-    const maxTableNumber = tables.reduce(
-      (max, table) => Math.max(max, table.tableNumber ?? 0),
-      0
+    let nextTableNumber = Number(
+      nextGeneratedTableNumber(tables.map((table) => table.tableNumber))
     );
-
-    let nextTableNumber = maxTableNumber + 1;
-    const usedNumbers = new Set<number>();
+    const usedNumbers = new Set<string>();
     const updates: Array<Promise<void>> = [];
 
     const orderedComponents = [...components].sort((left, right) => {
@@ -778,19 +840,23 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
       const leftNumbers = left
         .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is number => tableNumber != null);
+        .filter((tableNumber): tableNumber is string => tableNumber != null);
       const rightNumbers = right
         .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is number => tableNumber != null);
+        .filter((tableNumber): tableNumber is string => tableNumber != null);
 
       const leftMinNumber =
-        leftNumbers.length > 0 ? Math.min(...leftNumbers) : null;
+        leftNumbers.length > 0
+          ? [...leftNumbers].sort(compareTableNumbers)[0]
+          : null;
       const rightMinNumber =
-        rightNumbers.length > 0 ? Math.min(...rightNumbers) : null;
+        rightNumbers.length > 0
+          ? [...rightNumbers].sort(compareTableNumbers)[0]
+          : null;
 
       if (leftMinNumber != null && rightMinNumber != null) {
         if (leftMinNumber !== rightMinNumber) {
-          return leftMinNumber - rightMinNumber;
+          return compareTableNumbers(leftMinNumber, rightMinNumber);
         }
       }
 
@@ -800,15 +866,15 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     for (const component of orderedComponents) {
       const existingNumbers = component
         .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is number => tableNumber != null)
-        .sort((left, right) => left - right);
+        .filter((tableNumber): tableNumber is string => tableNumber != null)
+        .sort(compareTableNumbers);
 
       let targetNumber = existingNumbers.find(
         (tableNumber) => !usedNumbers.has(tableNumber)
       );
 
       if (targetNumber == null) {
-        targetNumber = nextTableNumber;
+        targetNumber = `${nextTableNumber}`;
         nextTableNumber += 1;
       }
 

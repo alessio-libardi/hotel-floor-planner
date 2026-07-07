@@ -15,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
+import { nextGeneratedTableNumber } from '../../table-number';
 
 export interface ShapeDetailRoomOption {
   floorId: string;
@@ -49,6 +50,7 @@ export interface ShapeDetailDialogData {
 export class ShapeDetailDialogComponent {
   protected readonly selectedItem: PlanItem;
   protected draftLabel = '';
+  protected draftTableNumber = '';
   protected draftRoomNumber: number | null = null;
   protected attemptedSubmit = false;
   protected isSaving = false;
@@ -68,8 +70,49 @@ export class ShapeDetailDialogComponent {
     this.selectedItem = { ...this.data.item };
 
     this.draftLabel = this.selectedItem.text;
+    this.draftTableNumber =
+      this.selectedItem.tableNumber != null
+        ? `${this.selectedItem.tableNumber}`
+        : '';
     this.draftRoomNumber = this.selectedItem.roomNumber;
     this.setDateRangeFromRoom(this.draftRoomNumber);
+  }
+
+  protected primaryFieldLabel(): string {
+    return this.selectedItem.type === 'table' ? 'Table number' : 'Label';
+  }
+
+  protected primaryFieldPlaceholder(): string {
+    return this.selectedItem.type === 'table'
+      ? 'Enter a table number'
+      : 'Enter a label';
+  }
+
+  protected primaryFieldType(): 'number' | 'text' {
+    return 'text';
+  }
+
+  protected primaryFieldValue(): string {
+    return this.selectedItem.type === 'table'
+      ? this.draftTableNumber
+      : this.draftLabel;
+  }
+
+  protected noteValue(): string {
+    return this.draftLabel;
+  }
+
+  protected onPrimaryFieldInput(value: string): void {
+    if (this.selectedItem.type === 'table') {
+      this.draftTableNumber = value;
+      return;
+    }
+
+    this.draftLabel = value;
+  }
+
+  protected onNoteInput(value: string): void {
+    this.draftLabel = value;
   }
 
   protected close(): void {
@@ -139,7 +182,12 @@ export class ShapeDetailDialogComponent {
   }
 
   protected saveButtonDisabled(): boolean {
-    return this.hasInvalidDateRange() || this.isSaving;
+    return (
+      this.hasInvalidDateRange() ||
+      this.hasInvalidTableNumber() ||
+      this.hasDuplicateTableNumber() ||
+      this.isSaving
+    );
   }
 
   protected async save(): Promise<void> {
@@ -150,16 +198,40 @@ export class ShapeDetailDialogComponent {
       return;
     }
 
+    if (this.hasInvalidTableNumber() || this.hasDuplicateTableNumber()) {
+      return;
+    }
+
     this.isSaving = true;
 
     try {
-      if (this.draftLabel !== this.selectedItem.text) {
+      if (
+        this.selectedItem.type !== 'table' &&
+        this.draftLabel !== this.selectedItem.text
+      ) {
         await this.store.updateItem(this.selectedItem.id, {
           text: this.draftLabel,
         });
       }
 
       if (this.selectedItem.type === 'table') {
+        const tableNumber = this.parsedDraftTableNumber();
+
+        if (
+          tableNumber != null &&
+          tableNumber !== this.selectedItem.tableNumber
+        ) {
+          await this.store.updateItem(this.selectedItem.id, {
+            tableNumber,
+          });
+        }
+
+        if (this.draftLabel !== this.selectedItem.text) {
+          await this.store.updateItem(this.selectedItem.id, {
+            text: this.draftLabel,
+          });
+        }
+
         await this.persistTableRoomAssignment();
         await this.persistRoomDateRange();
       }
@@ -182,6 +254,74 @@ export class ShapeDetailDialogComponent {
     return room
       ? `Floor ${room.floorNumber} - Room ${room.roomNumber}`
       : 'Linked room not found';
+  }
+
+  protected hasInvalidTableNumber(): boolean {
+    return (
+      this.selectedItem.type === 'table' &&
+      this.parsedDraftTableNumber() == null
+    );
+  }
+
+  protected hasDuplicateTableNumber(): boolean {
+    if (this.selectedItem.type !== 'table') {
+      return false;
+    }
+
+    const tableNumber = this.parsedDraftTableNumber();
+    if (tableNumber == null) {
+      return false;
+    }
+
+    return this.store.items.some(
+      (item) =>
+        item.type === 'table' &&
+        item.id !== this.selectedItem.id &&
+        item.tableNumber === tableNumber
+    );
+  }
+
+  protected async resetTable(): Promise<void> {
+    if (this.selectedItem.type !== 'table' || this.isSaving) {
+      return;
+    }
+
+    this.isSaving = true;
+    this.saveErrorMessage = '';
+
+    try {
+      const currentTable =
+        this.store.items.find((item) => item.id === this.selectedItem.id) ??
+        this.selectedItem;
+
+      await this.clearRoomDates(currentTable.roomNumber);
+      await this.unlinkTable(currentTable);
+
+      const resetTableNumber =
+        currentTable.linkedTableIds.length > 0
+          ? nextGeneratedTableNumber(
+              this.store.items
+                .filter(
+                  (item) => item.type === 'table' && item.id !== currentTable.id
+                )
+                .map((item) => item.tableNumber)
+            )
+          : currentTable.tableNumber;
+
+      await this.store.updateItem(currentTable.id, {
+        linkedTableIds: [],
+        roomNumber: null,
+        text: '',
+        tableNumber: resetTableNumber,
+      });
+
+      this.dialogRef.close({ reset: true });
+    } catch {
+      this.saveErrorMessage =
+        'Unable to reset this table right now. Please try again.';
+    } finally {
+      this.isSaving = false;
+    }
   }
 
   private async persistTableRoomAssignment(): Promise<void> {
@@ -243,6 +383,50 @@ export class ShapeDetailDialogComponent {
     );
   }
 
+  private async clearRoomDates(roomNumber: number | null): Promise<void> {
+    if (roomNumber == null) {
+      return;
+    }
+
+    const room = this.roomOptionByNumber(roomNumber);
+    if (!room) {
+      return;
+    }
+
+    if (room.arrivalDate == null && room.departureDate == null) {
+      return;
+    }
+
+    await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
+      arrivalDate: null,
+      departureDate: null,
+    });
+  }
+
+  private async unlinkTable(table: PlanItem): Promise<void> {
+    if (table.linkedTableIds.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      table.linkedTableIds.map(async (linkedTableId) => {
+        const linkedTable = this.store.items.find(
+          (item) => item.id === linkedTableId && item.type === 'table'
+        );
+
+        if (!linkedTable) {
+          return;
+        }
+
+        await this.store.updateItem(linkedTable.id, {
+          linkedTableIds: linkedTable.linkedTableIds.filter(
+            (entry) => entry !== table.id
+          ),
+        });
+      })
+    );
+  }
+
   private roomOptionByNumber(
     roomNumber: number
   ): ShapeDetailRoomOption | undefined {
@@ -271,6 +455,16 @@ export class ShapeDetailDialogComponent {
     const day = `${value.getDate()}`.padStart(2, '0');
 
     return `${year}-${month}-${day}`;
+  }
+
+  private parsedDraftTableNumber(): string | null {
+    const trimmed = this.draftTableNumber.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    return trimmed;
   }
 
   private toDateOnly(value: string | null): Date | null {
