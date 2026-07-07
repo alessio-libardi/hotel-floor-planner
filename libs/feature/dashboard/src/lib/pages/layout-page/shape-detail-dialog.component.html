@@ -107,7 +107,12 @@
     Delete
   </button>
   @if (selectedItem.type === 'table') {
-    <button mat-button type="button" [disabled]="isSaving" (click)="resetTable()">
+    <button
+      mat-button
+      type="button"
+      [disabled]="isSaving"
+      (click)="resetTable()"
+    >
       Reset table
     </button>
   }
