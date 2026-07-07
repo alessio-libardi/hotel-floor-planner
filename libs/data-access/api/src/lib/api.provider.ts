@@ -8,9 +8,13 @@ import { EnvironmentService } from '@util/env';
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+} from 'firebase/firestore';
 
-import { provideFirebaseApp } from '@angular/fire/app';
+import { getApp, provideFirebaseApp } from '@angular/fire/app';
 import { provideAuth } from '@angular/fire/auth';
 import { provideFirestore } from '@angular/fire/firestore';
 
@@ -32,7 +36,10 @@ export function provideApi(): EnvironmentProviders {
     }),
 
     provideFirestore(() => {
-      const firestore = getFirestore();
+      const app = getApp();
+      const firestore = initializeFirestore(app, {
+        localCache: persistentLocalCache(),
+      });
 
       if (isDevMode()) {
         connectFirestoreEmulator(firestore, '127.0.0.1', 8080);

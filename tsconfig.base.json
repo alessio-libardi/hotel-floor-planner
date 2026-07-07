@@ -19,7 +19,8 @@
       "@feature/dashboard": ["./libs/feature/dashboard/src/index.ts"],
       "@ui/theme": ["./libs/ui/theme/src/index.ts"],
       "@util/auth": ["./libs/util/auth/src/index.ts"],
-      "@util/env": ["./libs/util/environment/src/index.ts"]
+      "@util/env": ["./libs/util/environment/src/index.ts"],
+      "@ui/components": ["./libs/ui/components/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
