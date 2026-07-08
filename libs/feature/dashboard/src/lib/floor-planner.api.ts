@@ -43,6 +43,7 @@ interface RoomDoc {
   position: number;
   arrivalDate: string | null;
   departureDate: string | null;
+  checkedDate: string | null;
 }
 
 interface FloorDoc {
@@ -93,6 +94,16 @@ export class FloorPlannerApi {
     details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
   ) {
     return from(this.updateRoomDetailsInternal(floorId, roomId, details));
+  }
+
+  updateRoomCheckedDate(
+    floorId: string,
+    roomId: string,
+    checkedDate: string | null
+  ) {
+    return from(
+      this.updateRoomCheckedDateInternal(floorId, roomId, checkedDate)
+    );
   }
 
   deleteRoom(floorId: string, roomId: string) {
@@ -202,6 +213,7 @@ export class FloorPlannerApi {
         label: `Room ${floorData.number * 100 + nextPosition}`,
         arrivalDate: null,
         departureDate: null,
+        checkedDate: null,
       };
 
       transaction.update(floorRef, { rooms: [...rooms, nextRoom] });
@@ -212,6 +224,7 @@ export class FloorPlannerApi {
         number: floorData.number * 100 + nextRoom.position,
         arrivalDate: nextRoom.arrivalDate,
         departureDate: nextRoom.departureDate,
+        checkedDate: nextRoom.checkedDate,
       };
     });
   }
@@ -253,6 +266,7 @@ export class FloorPlannerApi {
         number: floorData.number * 100 + updatedRoom.position,
         arrivalDate: updatedRoom.arrivalDate,
         departureDate: updatedRoom.departureDate,
+        checkedDate: updatedRoom.checkedDate,
       };
     });
   }
@@ -321,6 +335,49 @@ export class FloorPlannerApi {
         number: floorData.number * 100 + updatedRoom.position,
         arrivalDate: updatedRoom.arrivalDate,
         departureDate: updatedRoom.departureDate,
+        checkedDate: updatedRoom.checkedDate,
+      };
+    });
+  }
+
+  private async updateRoomCheckedDateInternal(
+    floorId: string,
+    roomId: string,
+    checkedDate: string | null
+  ): Promise<RoomViewModel> {
+    this.auth.requireUser();
+
+    return runTransaction(this.firestore, async (transaction) => {
+      const floorRef = doc(this.firestore, 'floors', floorId);
+      const floorSnapshot = await transaction.get(floorRef);
+
+      if (!floorSnapshot.exists()) {
+        throw new Error('Floor not found');
+      }
+
+      const floorData = floorSnapshot.data() as FloorDoc;
+      const rooms = [...(floorData.rooms ?? [])];
+      const roomIndex = rooms.findIndex((room) => room.id === roomId);
+
+      if (roomIndex < 0) {
+        throw new Error('Room not found');
+      }
+
+      const updatedRoom: RoomDoc = {
+        ...rooms[roomIndex],
+        checkedDate,
+      };
+
+      rooms[roomIndex] = updatedRoom;
+      transaction.update(floorRef, { rooms });
+
+      return {
+        id: updatedRoom.id,
+        label: updatedRoom.label,
+        number: floorData.number * 100 + updatedRoom.position,
+        arrivalDate: updatedRoom.arrivalDate,
+        departureDate: updatedRoom.departureDate,
+        checkedDate: updatedRoom.checkedDate,
       };
     });
   }
@@ -482,6 +539,7 @@ export class FloorPlannerApi {
         number: floor.number * 100 + room.position,
         arrivalDate: room.arrivalDate ?? null,
         departureDate: room.departureDate ?? null,
+        checkedDate: room.checkedDate ?? null,
       }));
 
     return {

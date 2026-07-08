@@ -11,8 +11,10 @@ import {
   from,
   map,
   Observable,
+  startWith,
   shareReplay,
   switchMap,
+  timer,
 } from 'rxjs';
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
@@ -28,6 +30,20 @@ interface RoomTableAssignment {
   tableNumber: string;
   note: string;
 }
+
+interface RoomSwipeState {
+  startX: number;
+  startY: number;
+}
+
+interface SeatingViewModel {
+  floors: FloorViewModel[];
+  roomToTableMap: Map<number, RoomTableAssignment>;
+  today: string;
+}
+
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
+const SWIPE_LEFT_THRESHOLD = 48;
 
 @Component({
   selector: 'app-seating-page',
@@ -46,12 +62,23 @@ export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
   private readonly dialog = inject(MatDialog);
+  private readonly roomSwipeState = new Map<string, RoomSwipeState>();
+  private readonly swipeClickSuppression = new Map<string, number>();
 
   protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
     from(this.floorStore.ensureLoaded()).pipe(
       switchMap(() => this.floorStore.floors$)
     )
   ).pipe(shareReplay(1));
+
+  protected readonly today$ = timer(
+    this.msUntilTomorrow(),
+    DAY_IN_MILLISECONDS
+  ).pipe(
+    map(() => this.formatDateOnly(new Date())),
+    startWith(this.formatDateOnly(new Date())),
+    shareReplay(1)
+  );
 
   protected readonly roomToTableMap$ = this.planStore.items$.pipe(
     map((items) => {
@@ -77,9 +104,10 @@ export class SeatingPageComponent {
     shareReplay(1)
   );
 
-  protected readonly vm$ = combineLatest({
+  protected readonly vm$: Observable<SeatingViewModel> = combineLatest({
     floors: this.floors$,
     roomToTableMap: this.roomToTableMap$,
+    today: this.today$,
   });
 
   protected trackByFloor(_index: number, floor: FloorViewModel): string {
@@ -100,6 +128,54 @@ export class SeatingPageComponent {
     });
   }
 
+  protected handleRoomPointerDown(roomId: string, event: PointerEvent): void {
+    this.roomSwipeState.set(roomId, {
+      startX: event.clientX,
+      startY: event.clientY,
+    });
+  }
+
+  protected handleRoomPointerUp(roomId: string, event: PointerEvent): void {
+    const start = this.roomSwipeState.get(roomId);
+    this.roomSwipeState.delete(roomId);
+
+    if (!start) {
+      return;
+    }
+
+    const deltaX = event.clientX - start.startX;
+    const deltaY = event.clientY - start.startY;
+
+    if (deltaX < -SWIPE_LEFT_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+      this.swipeClickSuppression.set(roomId, Date.now());
+      void this.floorStore.markRoomCheckedToday(roomId);
+    }
+  }
+
+  protected handleRoomPointerCancel(roomId: string): void {
+    this.roomSwipeState.delete(roomId);
+  }
+
+  protected handleRoomClick(
+    roomId: string,
+    roomNumber: number,
+    note: string | null,
+    event: MouseEvent
+  ): void {
+    const suppressedAt = this.swipeClickSuppression.get(roomId);
+
+    if (suppressedAt != null && Date.now() - suppressedAt < 500) {
+      this.swipeClickSuppression.delete(roomId);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    this.swipeClickSuppression.delete(roomId);
+
+    this.openTableDetails(roomNumber, note);
+  }
+
   protected tableNumberForRoom(
     roomToTableMap: Map<number, RoomTableAssignment>,
     roomNumber: number
@@ -112,6 +188,10 @@ export class SeatingPageComponent {
     roomNumber: number
   ): string | null {
     return roomToTableMap.get(roomNumber)?.note ?? null;
+  }
+
+  protected isCheckedToday(checkedDate: string | null, today: string): boolean {
+    return checkedDate === today;
   }
 
   protected roomRowBackground(departureDate: string | null): string | null {
@@ -140,5 +220,20 @@ export class SeatingPageComponent {
     }
 
     return null;
+  }
+
+  private formatDateOnly(value: Date): string {
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, '0');
+    const day = `${value.getDate()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private msUntilTomorrow(now: Date = new Date()): number {
+    const nextDay = new Date(now);
+    nextDay.setHours(24, 0, 0, 0);
+
+    return Math.max(0, nextDay.getTime() - now.getTime());
   }
 }

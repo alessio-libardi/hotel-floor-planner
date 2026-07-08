@@ -80,6 +80,7 @@ export class FloorStore {
       label: `Room ${floor.number * 100 + nextPosition}`,
       arrivalDate: null,
       departureDate: null,
+      checkedDate: null,
     };
 
     this.setFloors(
@@ -103,6 +104,68 @@ export class FloorStore {
             ...entry,
             rooms: entry.rooms.map((room) =>
               room.id === tempRoom.id ? created : room
+            ),
+          };
+        })
+      );
+    } catch (error) {
+      this.setFloors(previous);
+      throw error;
+    }
+  }
+
+  async markRoomCheckedToday(roomId: string): Promise<void> {
+    const previous = this.snapshot();
+    const floor = this.floors.find((entry) =>
+      entry.rooms.some((room) => room.id === roomId)
+    );
+
+    if (!floor) {
+      return;
+    }
+
+    const room = floor.rooms.find((entry) => entry.id === roomId);
+
+    if (!room) {
+      return;
+    }
+
+    const checkedDate = this.formatDateOnly(new Date());
+
+    if (room.checkedDate === checkedDate) {
+      return;
+    }
+
+    this.setFloors(
+      this.floors.map((entry) => {
+        if (entry.id !== floor.id) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          rooms: entry.rooms.map((entryRoom) =>
+            entryRoom.id === roomId ? { ...entryRoom, checkedDate } : entryRoom
+          ),
+        };
+      })
+    );
+
+    try {
+      const updated = await firstValueFrom(
+        this.api.updateRoomCheckedDate(floor.id, roomId, checkedDate)
+      );
+
+      this.setFloors(
+        this.floors.map((entry) => {
+          if (entry.id !== floor.id) {
+            return entry;
+          }
+
+          return {
+            ...entry,
+            rooms: entry.rooms.map((entryRoom) =>
+              entryRoom.id === roomId ? { ...entryRoom, ...updated } : entryRoom
             ),
           };
         })
@@ -205,5 +268,13 @@ export class FloorStore {
 
   private tempId(prefix: string): string {
     return `tmp_${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  private formatDateOnly(value: Date): string {
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, '0');
+    const day = `${value.getDate()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
   }
 }

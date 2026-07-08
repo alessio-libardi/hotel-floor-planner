@@ -16,19 +16,32 @@
         <mat-action-list>
           <button
             mat-list-item
+            class="seating-room-row"
             *ngFor="let room of floor.rooms; trackBy: trackByRoom"
             type="button"
             [style.background-color]="roomRowBackground(room.departureDate)"
             [style.color]="roomRowForeground(room.departureDate)"
+            (pointerdown)="handleRoomPointerDown(room.id, $event)"
+            (pointerup)="handleRoomPointerUp(room.id, $event)"
+            (pointercancel)="handleRoomPointerCancel(room.id)"
             (click)="
-              openTableDetails(
+              handleRoomClick(
+                room.id,
                 room.number,
-                noteForRoom(vm.roomToTableMap, room.number)
+                noteForRoom(vm.roomToTableMap, room.number),
+                $event
               )
             "
           >
             <div matListItemTitle>Room {{ room.number }}</div>
             <span matListItemMeta class="seating-room-meta">
+              @if (isCheckedToday(room.checkedDate, vm.today)) {
+                <span class="seating-room-checked-chip">
+                  <mat-icon aria-hidden="true">check_circle</mat-icon>
+                  <span>Checked</span>
+                </span>
+              }
+
               @if (
                 tableNumberForRoom(vm.roomToTableMap, room.number);
                 as tableNumber
