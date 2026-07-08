@@ -186,6 +186,10 @@ export class SeatingPageComponent {
     return checkedDate === today;
   }
 
+  protected printPage(): void {
+    window.print();
+  }
+
   protected roomRowBackground(departureDate: string | null): string | null {
     const status = getRoomDepartureStatus(departureDate);
 

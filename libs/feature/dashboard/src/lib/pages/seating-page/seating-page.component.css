@@ -2,6 +2,13 @@
   display: block;
 }
 
+.seating-print-button {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 10;
+}
+
 .seating-room-meta {
   display: inline-flex;
   align-items: center;
@@ -70,4 +77,55 @@
   color: color-mix(in oklab, currentColor 72%, transparent);
   font-size: 0.8125rem;
   font-weight: 500;
+}
+
+@page {
+  margin: 12mm;
+}
+
+@media print {
+  :host {
+    color: #000;
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  :host ::ng-deep .shell-content > header {
+    display: none !important;
+  }
+
+  :host ::ng-deep .shell-content > main {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  :host ::ng-deep .mat-mdc-card,
+  :host ::ng-deep .mat-mdc-card-outlined,
+  :host ::ng-deep .mdc-list,
+  .seating-room-row,
+  .seating-room-table-chip,
+  .seating-room-checked-chip {
+    color: #000 !important;
+    background: #fff !important;
+    border-color: rgba(0, 0, 0, 0.3) !important;
+    box-shadow: none !important;
+  }
+
+  :host ::ng-deep .mat-mdc-card {
+    break-inside: avoid;
+  }
+
+  :host ::ng-deep .mat-mdc-card-title,
+  :host ::ng-deep .mat-mdc-card-subtitle,
+  :host ::ng-deep .mat-mdc-list-item-title,
+  :host ::ng-deep .mat-icon,
+  .seating-room-table-empty {
+    color: #000 !important;
+  }
+
+  .seating-print-button {
+    display: none !important;
+  }
 }

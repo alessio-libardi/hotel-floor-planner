@@ -13,6 +13,15 @@
       </mat-card-header>
 
       <mat-card-content>
+        <button
+          mat-fab
+          type="button"
+          class="seating-print-button"
+          aria-label="Print seating page"
+          (click)="printPage()"
+        >
+          <mat-icon aria-hidden="true">print</mat-icon>
+        </button>
         <mat-action-list class="seating-room-list">
           @for (room of floor.rooms; track room.id) {
             <button
