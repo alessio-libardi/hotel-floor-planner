@@ -115,65 +115,12 @@ export class FloorStore {
   }
 
   async markRoomCheckedToday(roomId: string): Promise<void> {
-    const previous = this.snapshot();
-    const floor = this.floors.find((entry) =>
-      entry.rooms.some((room) => room.id === roomId)
-    );
-
-    if (!floor) {
-      return;
-    }
-
-    const room = floor.rooms.find((entry) => entry.id === roomId);
-
-    if (!room) {
-      return;
-    }
-
     const checkedDate = this.formatDateOnly(new Date());
+    await this.setRoomCheckedDate(roomId, checkedDate);
+  }
 
-    if (room.checkedDate === checkedDate) {
-      return;
-    }
-
-    this.setFloors(
-      this.floors.map((entry) => {
-        if (entry.id !== floor.id) {
-          return entry;
-        }
-
-        return {
-          ...entry,
-          rooms: entry.rooms.map((entryRoom) =>
-            entryRoom.id === roomId ? { ...entryRoom, checkedDate } : entryRoom
-          ),
-        };
-      })
-    );
-
-    try {
-      const updated = await firstValueFrom(
-        this.api.updateRoomCheckedDate(floor.id, roomId, checkedDate)
-      );
-
-      this.setFloors(
-        this.floors.map((entry) => {
-          if (entry.id !== floor.id) {
-            return entry;
-          }
-
-          return {
-            ...entry,
-            rooms: entry.rooms.map((entryRoom) =>
-              entryRoom.id === roomId ? { ...entryRoom, ...updated } : entryRoom
-            ),
-          };
-        })
-      );
-    } catch (error) {
-      this.setFloors(previous);
-      throw error;
-    }
+  async clearRoomCheckedToday(roomId: string): Promise<void> {
+    await this.setRoomCheckedDate(roomId, null);
   }
 
   async removeRoom(floorId: string, roomId: string): Promise<void> {
@@ -276,5 +223,64 @@ export class FloorStore {
     const day = `${value.getDate()}`.padStart(2, '0');
 
     return `${year}-${month}-${day}`;
+  }
+
+  private async setRoomCheckedDate(
+    roomId: string,
+    checkedDate: string | null
+  ): Promise<void> {
+    const previous = this.snapshot();
+    const floor = this.floors.find((entry) =>
+      entry.rooms.some((room) => room.id === roomId)
+    );
+
+    if (!floor) {
+      return;
+    }
+
+    const room = floor.rooms.find((entry) => entry.id === roomId);
+
+    if (!room || room.checkedDate === checkedDate) {
+      return;
+    }
+
+    this.setFloors(
+      this.floors.map((entry) => {
+        if (entry.id !== floor.id) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          rooms: entry.rooms.map((entryRoom) =>
+            entryRoom.id === roomId ? { ...entryRoom, checkedDate } : entryRoom
+          ),
+        };
+      })
+    );
+
+    try {
+      const updated = await firstValueFrom(
+        this.api.updateRoomCheckedDate(floor.id, roomId, checkedDate)
+      );
+
+      this.setFloors(
+        this.floors.map((entry) => {
+          if (entry.id !== floor.id) {
+            return entry;
+          }
+
+          return {
+            ...entry,
+            rooms: entry.rooms.map((entryRoom) =>
+              entryRoom.id === roomId ? { ...entryRoom, ...updated } : entryRoom
+            ),
+          };
+        })
+      );
+    } catch (error) {
+      this.setFloors(previous);
+      throw error;
+    }
   }
 }

@@ -5,6 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
+import { DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
 import {
   combineLatest,
   defer,
@@ -31,11 +32,6 @@ interface RoomTableAssignment {
   note: string;
 }
 
-interface RoomSwipeState {
-  startX: number;
-  startY: number;
-}
-
 interface SeatingViewModel {
   floors: FloorViewModel[];
   roomToTableMap: Map<number, RoomTableAssignment>;
@@ -43,12 +39,14 @@ interface SeatingViewModel {
 }
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
-const SWIPE_LEFT_THRESHOLD = 48;
+const SWIPE_ACTION_THRESHOLD = 64;
+const SWIPE_CLICK_SUPPRESSION_MS = 500;
 
 @Component({
-  selector: 'app-seating-page',
+  selector: 'lib-seating-page',
   imports: [
     CommonModule,
+    DragDropModule,
     MatButtonModule,
     MatCardModule,
     MatDialogModule,
@@ -62,7 +60,6 @@ export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
   private readonly dialog = inject(MatDialog);
-  private readonly roomSwipeState = new Map<string, RoomSwipeState>();
   private readonly swipeClickSuppression = new Map<string, number>();
 
   protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
@@ -128,32 +125,24 @@ export class SeatingPageComponent {
     });
   }
 
-  protected handleRoomPointerDown(roomId: string, event: PointerEvent): void {
-    this.roomSwipeState.set(roomId, {
-      startX: event.clientX,
-      startY: event.clientY,
-    });
-  }
+  protected handleRoomDragEnded(
+    roomId: string,
+    checkedDate: string | null,
+    today: string,
+    event: CdkDragEnd
+  ): void {
+    const deltaX = event.distance.x;
 
-  protected handleRoomPointerUp(roomId: string, event: PointerEvent): void {
-    const start = this.roomSwipeState.get(roomId);
-    this.roomSwipeState.delete(roomId);
-
-    if (!start) {
+    if (deltaX <= -SWIPE_ACTION_THRESHOLD) {
+      this.swipeClickSuppression.set(roomId, Date.now());
+      void this.floorStore.markRoomCheckedToday(roomId);
       return;
     }
 
-    const deltaX = event.clientX - start.startX;
-    const deltaY = event.clientY - start.startY;
-
-    if (deltaX < -SWIPE_LEFT_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+    if (deltaX >= SWIPE_ACTION_THRESHOLD && checkedDate === today) {
       this.swipeClickSuppression.set(roomId, Date.now());
-      void this.floorStore.markRoomCheckedToday(roomId);
+      void this.floorStore.clearRoomCheckedToday(roomId);
     }
-  }
-
-  protected handleRoomPointerCancel(roomId: string): void {
-    this.roomSwipeState.delete(roomId);
   }
 
   protected handleRoomClick(
@@ -164,7 +153,10 @@ export class SeatingPageComponent {
   ): void {
     const suppressedAt = this.swipeClickSuppression.get(roomId);
 
-    if (suppressedAt != null && Date.now() - suppressedAt < 500) {
+    if (
+      suppressedAt != null &&
+      Date.now() - suppressedAt < SWIPE_CLICK_SUPPRESSION_MS
+    ) {
       this.swipeClickSuppression.delete(roomId);
       event.preventDefault();
       event.stopPropagation();

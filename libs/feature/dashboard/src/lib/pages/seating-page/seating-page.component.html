@@ -17,13 +17,15 @@
           <button
             mat-list-item
             class="seating-room-row"
+            cdkDrag
+            cdkDragLockAxis="x"
             *ngFor="let room of floor.rooms; trackBy: trackByRoom"
             type="button"
             [style.background-color]="roomRowBackground(room.departureDate)"
             [style.color]="roomRowForeground(room.departureDate)"
-            (pointerdown)="handleRoomPointerDown(room.id, $event)"
-            (pointerup)="handleRoomPointerUp(room.id, $event)"
-            (pointercancel)="handleRoomPointerCancel(room.id)"
+            (cdkDragEnded)="
+              handleRoomDragEnded(room.id, room.checkedDate, vm.today, $event)
+            "
             (click)="
               handleRoomClick(
                 room.id,
@@ -36,9 +38,12 @@
             <div matListItemTitle>Room {{ room.number }}</div>
             <span matListItemMeta class="seating-room-meta">
               @if (isCheckedToday(room.checkedDate, vm.today)) {
-                <span class="seating-room-checked-chip">
-                  <mat-icon aria-hidden="true">check_circle</mat-icon>
-                  <span>Checked</span>
+                <span
+                  class="seating-room-checked-chip"
+                  aria-label="Checked today"
+                  title="Checked today"
+                >
+                  <mat-icon aria-hidden="true">check</mat-icon>
                 </span>
               }
 
