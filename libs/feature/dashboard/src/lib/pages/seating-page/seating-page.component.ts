@@ -5,7 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import {
   combineLatest,
   defer,
@@ -129,6 +129,7 @@ export class SeatingPageComponent {
     roomId: string,
     checkedDate: string | null,
     today: string,
+    drag: CdkDrag,
     event: CdkDragEnd
   ): void {
     const deltaX = event.distance.x;
@@ -136,13 +137,12 @@ export class SeatingPageComponent {
     if (deltaX <= -SWIPE_ACTION_THRESHOLD) {
       this.swipeClickSuppression.set(roomId, Date.now());
       void this.floorStore.markRoomCheckedToday(roomId);
-      return;
-    }
-
-    if (deltaX >= SWIPE_ACTION_THRESHOLD && checkedDate === today) {
+    } else if (deltaX >= SWIPE_ACTION_THRESHOLD && checkedDate === today) {
       this.swipeClickSuppression.set(roomId, Date.now());
       void this.floorStore.clearRoomCheckedToday(roomId);
     }
+
+    drag.reset();
   }
 
   protected handleRoomClick(

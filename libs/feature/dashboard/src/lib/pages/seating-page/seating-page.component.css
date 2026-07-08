@@ -10,6 +10,11 @@
   gap: 0.4rem;
 }
 
+.seating-room-list {
+  overflow: hidden;
+  padding-block: 0.35rem;
+}
+
 .seating-room-row {
   touch-action: pan-y;
   transition:

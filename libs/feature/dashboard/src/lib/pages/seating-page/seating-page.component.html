@@ -13,53 +13,62 @@
       </mat-card-header>
 
       <mat-card-content>
-        <mat-action-list>
-          <button
-            mat-list-item
-            class="seating-room-row"
-            cdkDrag
-            cdkDragLockAxis="x"
-            *ngFor="let room of floor.rooms; trackBy: trackByRoom"
-            type="button"
-            [style.background-color]="roomRowBackground(room.departureDate)"
-            [style.color]="roomRowForeground(room.departureDate)"
-            (cdkDragEnded)="
-              handleRoomDragEnded(room.id, room.checkedDate, vm.today, $event)
-            "
-            (click)="
-              handleRoomClick(
-                room.id,
-                room.number,
-                noteForRoom(vm.roomToTableMap, room.number),
-                $event
-              )
-            "
-          >
-            <div matListItemTitle>Room {{ room.number }}</div>
-            <span matListItemMeta class="seating-room-meta">
-              @if (isCheckedToday(room.checkedDate, vm.today)) {
-                <span
-                  class="seating-room-checked-chip"
-                  aria-label="Checked today"
-                  title="Checked today"
-                >
-                  <mat-icon aria-hidden="true">check</mat-icon>
-                </span>
-              }
+        <mat-action-list class="seating-room-list">
+          @for (room of floor.rooms; track room.id) {
+            <button
+              mat-list-item
+              #roomDrag="cdkDrag"
+              class="seating-room-row"
+              cdkDrag
+              cdkDragLockAxis="x"
+              cdkDragBoundary=".seating-room-list"
+              type="button"
+              [style.background-color]="roomRowBackground(room.departureDate)"
+              [style.color]="roomRowForeground(room.departureDate)"
+              (cdkDragEnded)="
+                handleRoomDragEnded(
+                  room.id,
+                  room.checkedDate,
+                  vm.today,
+                  roomDrag,
+                  $event
+                )
+              "
+              (click)="
+                handleRoomClick(
+                  room.id,
+                  room.number,
+                  noteForRoom(vm.roomToTableMap, room.number),
+                  $event
+                )
+              "
+            >
+              <div matListItemTitle>Room {{ room.number }}</div>
+              <span matListItemMeta class="seating-room-meta">
+                @if (isCheckedToday(room.checkedDate, vm.today)) {
+                  <span
+                    class="seating-room-checked-chip"
+                    aria-label="Checked today"
+                    title="Checked today"
+                  >
+                    <mat-icon aria-hidden="true">check</mat-icon>
+                  </span>
+                }
 
-              @if (
-                tableNumberForRoom(vm.roomToTableMap, room.number);
-                as tableNumber
-              ) {
-                <span class="seating-room-table-chip">
-                  <mat-icon aria-hidden="true">table_restaurant</mat-icon>
-                  <span>{{ tableNumber }}</span>
-                </span>
-              } @else {
-                <span class="seating-room-table-empty">No table</span>
-              }
-            </span>
-          </button>
+                @if (
+                  tableNumberForRoom(vm.roomToTableMap, room.number);
+                  as tableNumber
+                ) {
+                  <span class="seating-room-table-chip">
+                    <mat-icon aria-hidden="true">table_restaurant</mat-icon>
+                    <span>{{ tableNumber }}</span>
+                  </span>
+                } @else {
+                  <span class="seating-room-table-empty">No table</span>
+                }
+              </span>
+            </button>
+          }
 
           <mat-list-item *ngIf="!floor.rooms.length">
             <div matListItemTitle>No rooms</div>
