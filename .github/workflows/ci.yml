@@ -27,6 +27,9 @@ jobs:
 
       - name: Check formatting (affected)
         run: npm run format:check
+        env:
+          NX_BASE: origin/main
+          NX_HEAD: HEAD
 
   lint:
     runs-on: ubuntu-latest
