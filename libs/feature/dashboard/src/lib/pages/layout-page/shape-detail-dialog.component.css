@@ -1,0 +1,54 @@
+.shape-detail-dialog-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0;
+}
+
+.shape-detail-dialog-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.shape-detail-dialog-content .mat-mdc-form-field {
+  width: 100%;
+}
+
+.shape-detail-dialog-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.shape-detail-dialog-section-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.shape-detail-dialog-room-summary {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.shape-detail-dialog-muted {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.shape-detail-dialog-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--mat-sys-error);
+}
+
+.shape-detail-dialog-links {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.shape-detail-dialog-spacer {
+  flex: 1 1 auto;
+}

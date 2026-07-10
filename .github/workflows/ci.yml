@@ -27,6 +27,9 @@ jobs:
 
       - name: Check formatting (affected)
         run: npm run format:check
+        env:
+          NX_BASE: origin/main
+          NX_HEAD: HEAD
 
   lint:
     runs-on: ubuntu-latest
@@ -76,7 +79,7 @@ jobs:
     name: Deploy
     environment:
       name: Preview
-      url: ${{ github.event.pull_request.head.ref }}--${{vars.WEBSITE_URL}}
+      url: ${{ vars.WEBSITE_URL }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -99,36 +102,7 @@ jobs:
         run: npm ci
 
       - name: Build app
-        run: npm run build
+        run: npm run build -- -c preview
 
-      - name: Deploy preview
-        run: npm run firebase:preview -- ${{ github.event.pull_request.head.ref }} --expires 7d
-
-  cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    name: Cleanup
-    runs-on: ubuntu-latest
-    environment:
-      name: Preview
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          create_credentials_file: true
-          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
-          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Delete preview
-        run: npm run firebase:delete -- ${{ github.event.pull_request.head.ref }}
+      - name: Deploy
+        run: npm run firebase:deploy -- --project hotel-floor-planner---preview --only hosting,firestore:rules,firestore:indexes

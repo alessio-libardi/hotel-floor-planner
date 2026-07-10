@@ -1,0 +1,64 @@
+<section
+  class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full h-full relative overflow-visible"
+>
+  @for (floor of this.floors$ | async; track floor.id) {
+    <mat-card appearance="outlined" class="min-w-0">
+      <mat-card-header
+        class="flex items-start justify-between gap-2 pb-2! border-b border-(--mat-sys-outline-variant)"
+      >
+        <mat-card-title>{{ floorLabel(floor.number) }}</mat-card-title>
+        <mat-card-subtitle>{{ floor.rooms.length }} rooms</mat-card-subtitle>
+
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Remove floor"
+          (click)="removeFloor(floor.id)"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-card-header>
+
+      <mat-card-content>
+        <mat-action-list>
+          <button
+            mat-list-item
+            *ngFor="let room of floor.rooms; trackBy: trackByRoom"
+            type="button"
+            [style.background-color]="roomRowBackground(room)"
+            [style.color]="roomRowForeground(room)"
+            (click)="openRoomDetails(floor.id, room)"
+          >
+            <div matListItemTitle>Room {{ room.number }}</div>
+          </button>
+
+          <mat-list-item *ngIf="!floor.rooms.length">
+            <div matListItemTitle>No rooms yet</div>
+          </mat-list-item>
+        </mat-action-list>
+      </mat-card-content>
+
+      <mat-card-actions>
+        <button
+          mat-button
+          [matButton]="'tonal'"
+          type="button"
+          class="w-full"
+          (click)="addRoom(floor.id)"
+        >
+          <mat-icon>add</mat-icon>
+          Add room
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+
+  <button
+    aria-label="Add floor"
+    class="absolute! bottom-0 right-0"
+    matFab
+    (click)="addFloor()"
+  >
+    <mat-icon>add</mat-icon>
+  </button>
+</section>

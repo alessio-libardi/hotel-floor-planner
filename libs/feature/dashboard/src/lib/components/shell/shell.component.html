@@ -1,0 +1,95 @@
+<mat-drawer-container class="shell-drawer-container">
+  @if (isSmallViewport()) {
+    <mat-drawer
+      class="shell-drawer"
+      mode="over"
+      position="start"
+      [opened]="isNavigationDrawerOpen()"
+      (openedChange)="onNavigationDrawerStateChange($event)"
+    >
+      <mat-nav-list class="shell-drawer-nav">
+        @for (item of menuItems; track item.route) {
+          <a
+            mat-list-item
+            [routerLink]="item.route"
+            routerLinkActive
+            #drawerItemActive="routerLinkActive"
+            [activated]="drawerItemActive.isActive"
+          >
+            {{ item.label }}
+          </a>
+        }
+      </mat-nav-list>
+    </mat-drawer>
+  }
+
+  <mat-drawer-content class="shell-content">
+    <header
+      class="border-b border-(--mat-sys-outline-variant) bg-(--mat-sys-surface)"
+    >
+      <mat-toolbar class="flex items-center gap-3 bg-(--mat-sys-surface) px-4">
+        @if (isSmallViewport()) {
+          <button
+            mat-icon-button
+            aria-label="Toggle navigation menu"
+            (click)="toggleNavigationMenu()"
+          >
+            <mat-icon>menu</mat-icon>
+          </button>
+        }
+
+        <lib-logo class="h-8 w-8 shrink-0"></lib-logo>
+
+        <h3 class="m-0 text-(--mat-sys-title-medium) font-medium">Seatwise</h3>
+
+        <nav class="hidden items-center gap-2 sm:flex">
+          @for (item of menuItems; track item.route) {
+            <a
+              [routerLink]="item.route"
+              routerLinkActive
+              #toolbarItemActive="routerLinkActive"
+              [matButton]="toolbarItemActive.isActive ? 'tonal' : 'text'"
+              color="primary"
+            >
+              {{ item.label }}
+            </a>
+          }
+        </nav>
+
+        <div class="flex-1"></div>
+
+        <button
+          mat-icon-button
+          [matMenuTriggerFor]="userMenu"
+          aria-label="Open user menu"
+        >
+          @if (user(); as currentUser) {
+            @if (currentUser.photoURL) {
+              <img
+                [src]="currentUser.photoURL"
+                [alt]="currentUser.displayName ?? 'User avatar'"
+                width="40"
+                height="40"
+              />
+            } @else {
+              <mat-icon>person</mat-icon>
+            }
+          } @else {
+            <mat-icon>person</mat-icon>
+          }
+        </button>
+
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Logout</span>
+          </button>
+        </mat-menu>
+      </mat-toolbar>
+    </header>
+
+    <main class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4">
+      <router-outlet></router-outlet>
+    </main>
+  </mat-drawer-content>
+</mat-drawer-container>

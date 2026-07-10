@@ -60,6 +60,33 @@ npm run firebase:deploy:hosting
 Firestore rules require authenticated users (`request.auth != null`).
 This app uses Google sign-in, so enable the Google provider in Firebase Authentication.
 
+## PWA icons and iOS splash screens
+
+Use this generator to build app icons and iOS startup images:
+
+- https://progressier.com/pwa-icons-and-ios-splash-screen-generator
+
+Suggested workflow for this workspace:
+
+1. Open the generator and upload a high-resolution source image.
+2. Generate both:
+   - PWA icons (including maskable)
+   - iOS splash/startup images
+3. Copy generated icon files into:
+   - `apps/app/public/icons`
+4. Keep `apps/app/public/manifest.webmanifest` in sync with generated icon names/sizes.
+5. Add generated iOS splash `<link rel="apple-touch-startup-image" ... />` tags to:
+   - `apps/app/src/index.html`
+6. Verify locally:
+   - Run the app
+   - Open Chrome DevTools Application tab and confirm manifest icons are detected
+   - Test Add to Home Screen and iOS startup screens on a device/simulator
+
+Notes:
+
+- Keep icon paths rooted at `/icons/...` so they resolve from `public` in Angular builds.
+- If you replace existing icon names, update both `manifest.webmanifest` and any explicit favicon/apple-touch links in `index.html`.
+
 ## Formatting
 
 This workspace uses Prettier as the single formatter, integrated with ESLint to enforce formatting standards.

@@ -1,0 +1,132 @@
+<div mat-dialog-title class="">
+  <span>Edit item</span>
+</div>
+
+<mat-dialog-content class="shape-detail-dialog-content">
+  <mat-form-field appearance="outline">
+    <mat-label>{{ primaryFieldLabel() }}</mat-label>
+    <input
+      matInput
+      [type]="primaryFieldType()"
+      [value]="primaryFieldValue()"
+      (input)="onPrimaryFieldInput($any($event.target).value)"
+      [placeholder]="primaryFieldPlaceholder()"
+    />
+    @if (
+      selectedItem.type === 'table' &&
+      attemptedSubmit &&
+      hasInvalidTableNumber()
+    ) {
+      <mat-error>Enter a table number.</mat-error>
+    }
+    @if (
+      selectedItem.type === 'table' &&
+      attemptedSubmit &&
+      hasDuplicateTableNumber()
+    ) {
+      <mat-error>That table number is already in use.</mat-error>
+    }
+  </mat-form-field>
+
+  @if (selectedItem.type === 'table') {
+    <mat-form-field appearance="outline">
+      <mat-label>Linked room</mat-label>
+      <mat-select
+        [value]="roomSelectionValue()"
+        (selectionChange)="onRoomSelectionChange(($event.value ?? '') + '')"
+      >
+        <mat-option value="">Unassigned</mat-option>
+        @for (group of groupedRooms(); track group.floorNumber) {
+          <mat-optgroup [label]="'Floor ' + group.floorNumber">
+            @for (room of group.rooms; track room.roomId) {
+              <mat-option [value]="room.roomNumber">
+                Room {{ room.roomNumber }}
+              </mat-option>
+            }
+          </mat-optgroup>
+        }
+      </mat-select>
+      <mat-hint>Select a room grouped by floor.</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Note</mat-label>
+      <textarea
+        matInput
+        rows="3"
+        [value]="noteValue()"
+        (input)="onNoteInput($any($event.target).value)"
+        placeholder="Add a note for this table"
+      ></textarea>
+    </mat-form-field>
+
+    <div class="shape-detail-dialog-section">
+      <p class="shape-detail-dialog-section-title">Stay period</p>
+
+      @if (canEditRoomDates()) {
+        <p class="shape-detail-dialog-room-summary">
+          {{ linkedRoomSummary() }}
+        </p>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Arrival and leaving date</mat-label>
+          <mat-date-range-input
+            [rangePicker]="picker"
+            [formGroup]="stayRange"
+            [separator]="'-'"
+          >
+            <input matStartDate formControlName="start" placeholder="Arrival" />
+            <input matEndDate formControlName="end" placeholder="Leaving" />
+          </mat-date-range-input>
+          <mat-datepicker-toggle matIconSuffix [for]="picker" />
+          <mat-date-range-picker #picker />
+          @if (attemptedSubmit && hasInvalidDateRange()) {
+            <mat-error
+              >Leaving date cannot be earlier than arrival date.</mat-error
+            >
+          }
+        </mat-form-field>
+      } @else {
+        <p class="shape-detail-dialog-muted">
+          Link a room to edit arrival and leaving dates.
+        </p>
+      }
+    </div>
+  }
+
+  <p class="shape-detail-dialog-muted">
+    Changes are saved only when you press Save.
+  </p>
+  @if (saveErrorMessage) {
+    <p class="shape-detail-dialog-error">{{ saveErrorMessage }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" color="warn" (click)="deleteSelected()">
+    Delete
+  </button>
+  @if (selectedItem.type === 'table') {
+    <button
+      mat-button
+      type="button"
+      [disabled]="isSaving"
+      (click)="resetTable()"
+    >
+      Reset table
+    </button>
+  }
+  <span class="shape-detail-dialog-spacer"></span>
+  <button mat-button type="button" [disabled]="isSaving" (click)="close()">
+    Cancel
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="saveButtonDisabled()"
+    (click)="save()"
+  >
+    Save
+  </button>
+</mat-dialog-actions>

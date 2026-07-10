@@ -1,0 +1,29 @@
+<h2 mat-dialog-title>Room {{ data.roomNumber }}</h2>
+
+<mat-dialog-content class="grid gap-4">
+  <mat-form-field appearance="outline" class="pt-2 w-full">
+    <mat-label>Stay period</mat-label>
+    <mat-date-range-input
+      [rangePicker]="picker"
+      [formGroup]="stayRange"
+      class="w-full"
+      [separator]="'-'"
+    >
+      <input matStartDate formControlName="start" placeholder="Check-in date" />
+      <input matEndDate formControlName="end" placeholder="Check-out date" />
+    </mat-date-range-input>
+    <mat-hint>Choose the full stay window for this room.</mat-hint>
+    <mat-datepicker-toggle matIconSuffix [for]="picker" />
+    <mat-date-range-picker #picker />
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" color="warn" (click)="deleteRoom()">
+    Delete
+  </button>
+  <button mat-button type="button" (click)="close()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" (click)="save()">
+    Save
+  </button>
+</mat-dialog-actions>

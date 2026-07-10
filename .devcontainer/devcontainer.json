@@ -15,6 +15,9 @@
       "extensions": [
         "nrwl.angular-console",
         "angular.ng-template",
+        "csstools.postcss",
+        "bradlc.vscode-tailwindcss",
+        "toba.vsfire",
         "editorconfig.editorconfig",
         "esbenp.prettier-vscode",
         "dbaeumer.vscode-eslint",
@@ -22,7 +25,11 @@
         "github.vscode-pull-request-github"
       ],
       "settings": {
+        "files.associations": {
+          "*.css": "tailwindcss"
+        },
         "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
         "js/ts.tsdk.path": "node_modules/typescript/lib"
       }
     }

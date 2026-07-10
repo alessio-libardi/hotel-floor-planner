@@ -1,0 +1,89 @@
+<section *ngIf="vm$ | async as vm" class="grid gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+    <mat-card
+      *ngFor="let floor of vm.floors; trackBy: trackByFloor"
+      appearance="outlined"
+      class="min-w-0 h-full"
+    >
+      <mat-card-header
+        class="flex items-start justify-between gap-2 pb-2! border-b border-(--mat-sys-outline-variant)"
+      >
+        <mat-card-title>Floor {{ floor.number }}</mat-card-title>
+        <mat-card-subtitle>{{ floor.rooms.length }} rooms</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <button
+          mat-fab
+          type="button"
+          class="seating-print-button"
+          aria-label="Print seating page"
+          (click)="printPage()"
+        >
+          <mat-icon aria-hidden="true">print</mat-icon>
+        </button>
+        <mat-action-list class="seating-room-list">
+          @for (room of floor.rooms; track room.id) {
+            <button
+              mat-list-item
+              #roomDrag="cdkDrag"
+              class="seating-room-row"
+              cdkDrag
+              cdkDragLockAxis="x"
+              cdkDragBoundary=".seating-room-list"
+              type="button"
+              [style.background-color]="roomRowBackground(room.departureDate)"
+              [style.color]="roomRowForeground(room.departureDate)"
+              (cdkDragEnded)="
+                handleRoomDragEnded(
+                  room.id,
+                  room.checkedDate,
+                  vm.today,
+                  roomDrag,
+                  $event
+                )
+              "
+              (click)="
+                handleRoomClick(
+                  room.id,
+                  room.number,
+                  noteForRoom(vm.roomToTableMap, room.number),
+                  $event
+                )
+              "
+            >
+              <div matListItemTitle>Room {{ room.number }}</div>
+              <span matListItemMeta class="seating-room-meta">
+                @if (isCheckedToday(room.checkedDate, vm.today)) {
+                  <span
+                    class="seating-room-checked-chip"
+                    aria-label="Checked today"
+                    title="Checked today"
+                  >
+                    <mat-icon aria-hidden="true">check</mat-icon>
+                  </span>
+                }
+
+                @if (
+                  tableNumberForRoom(vm.roomToTableMap, room.number);
+                  as tableNumber
+                ) {
+                  <span class="seating-room-table-chip">
+                    <mat-icon aria-hidden="true">table_restaurant</mat-icon>
+                    <span>{{ tableNumber }}</span>
+                  </span>
+                } @else {
+                  <span class="seating-room-table-empty">No table</span>
+                }
+              </span>
+            </button>
+          }
+
+          <mat-list-item *ngIf="!floor.rooms.length">
+            <div matListItemTitle>No rooms</div>
+          </mat-list-item>
+        </mat-action-list>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</section>

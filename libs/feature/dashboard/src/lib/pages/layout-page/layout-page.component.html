@@ -1,0 +1,103 @@
+<section class="layout-page">
+  <div class="layout-canvas">
+    <div #stageHost class="layout-stage"></div>
+  </div>
+
+  <mat-toolbar class="layout-toolbar mat-elevation-z8">
+    <div class="layout-toolbar-group">
+      <button
+        mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="isPanMode()"
+        type="button"
+        aria-label="Pan mode"
+        [attr.aria-pressed]="isPanMode()"
+        (click)="setPanMode(true)"
+      >
+        <mat-icon>open_with</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="!isPanMode() && !isLinkMode()"
+        type="button"
+        aria-label="Edit mode"
+        [attr.aria-pressed]="!isPanMode() && !isLinkMode()"
+        (click)="setPanMode(false)"
+      >
+        <mat-icon>drag_indicator</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="layout-mode-button"
+        [class.layout-mode-button--active]="isLinkMode()"
+        type="button"
+        aria-label="Link mode"
+        [attr.aria-pressed]="isLinkMode()"
+        (click)="setLinkMode(!isLinkMode())"
+      >
+        <mat-icon>link</mat-icon>
+      </button>
+      <span class="layout-mode-indicator">{{ currentModeLabel() }}</span>
+    </div>
+
+    <span class="layout-toolbar-spacer"></span>
+
+    <div class="layout-toolbar-group">
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Add table"
+        (click)="addTable()"
+      >
+        <mat-icon>table_restaurant</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Add container"
+        (click)="addColumn()"
+      >
+        <mat-icon>inventory_2</mat-icon>
+      </button>
+    </div>
+
+    <span class="layout-toolbar-spacer"></span>
+
+    <div class="layout-toolbar-group">
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Zoom out"
+        (click)="zoomOut()"
+      >
+        <mat-icon>remove</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Reset view"
+        (click)="resetView()"
+      >
+        <mat-icon>center_focus_strong</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Zoom in"
+        (click)="zoomIn()"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </mat-toolbar>
+
+  @if (isLinkMode()) {
+    <p class="layout-link-hint">
+      {{
+        linkModeStatus() ||
+          'Select a table, then click another table to link or unlink.'
+      }}
+    </p>
+  }
+</section>

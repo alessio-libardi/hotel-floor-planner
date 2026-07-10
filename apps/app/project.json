@@ -3,14 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
-  "root": "apps/app",
   "sourceRoot": "apps/app/src",
   "tags": [],
   "targets": {
     "build": {
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
+      "defaultConfiguration": "live",
       "options": {
         "outputPath": "dist/apps/app",
         "browser": "apps/app/src/main.ts",
@@ -22,15 +21,29 @@
             "input": "apps/app/public"
           }
         ],
-        "styles": ["apps/app/src/styles.css"]
+        "styles": [
+          "apps/app/src/styles.css",
+          "libs/ui/theme/src/lib/material.scss"
+        ]
       },
       "configurations": {
-        "production": {
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true,
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.development.ts"
+            }
+          ]
+        },
+        "preview": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
-              "maximumError": "1.2mb"
+              "maximumWarning": "0.5mb",
+              "maximumError": "2mb"
             },
             {
               "type": "anyComponentStyle",
@@ -38,12 +51,34 @@
               "maximumError": "8kb"
             }
           ],
-          "outputHashing": "all"
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.preview.ts"
+            }
+          ]
         },
-        "development": {
-          "optimization": false,
-          "extractLicenses": false,
-          "sourceMap": true
+        "live": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "0.5mb",
+              "maximumError": "2mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/app/src/environments/environment.ts",
+              "with": "apps/app/src/environments/environment.live.ts"
+            }
+          ]
         }
       }
     },
@@ -52,11 +87,14 @@
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
       "configurations": {
-        "production": {
-          "buildTarget": "app:build:production"
-        },
         "development": {
           "buildTarget": "app:build:development"
+        },
+        "preview": {
+          "buildTarget": "app:build:preview"
+        },
+        "live": {
+          "buildTarget": "app:build:live"
         }
       }
     },

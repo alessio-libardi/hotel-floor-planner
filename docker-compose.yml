@@ -4,7 +4,7 @@ services:
     image: evolutecx/firebase-emulator:latest
     restart: unless-stopped
     environment:
-      - FB_PROJECT_ID=hotel-floor-planner
+      - FB_PROJECT_ID=hotel-floor-planner---preview
     ports:
       - '4000:4000' # Emulator UI
       - '9099:9099' # Auth
@@ -13,5 +13,4 @@ services:
       - '9199:9199' # Storage
       - '9000:9000' # Realtime DB
     volumes:
-      - ./firebase-data:/firebase/data:rw
-
+      - ./firebase-data:/workspaces/firebase/data:rw

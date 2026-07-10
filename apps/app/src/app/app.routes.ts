@@ -1,28 +1,5 @@
 import { Route } from '@angular/router';
-import { FloorConfigPageComponent } from './floor-config-page.component';
-import { FloorOverviewPageComponent } from './floor-overview-page.component';
-import { PlanPageComponent } from './plan-page.component';
+import { authRoutes } from '@feature/auth';
+import { dashboardRoutes } from '@feature/dashboard';
 
-export const appRoutes: Route[] = [
-  {
-    path: '',
-    pathMatch: 'full',
-    redirectTo: 'configure',
-  },
-  {
-    path: 'configure',
-    component: FloorConfigPageComponent,
-  },
-  {
-    path: 'overview',
-    component: FloorOverviewPageComponent,
-  },
-  {
-    path: 'plan',
-    component: PlanPageComponent,
-  },
-  {
-    path: '**',
-    redirectTo: 'configure',
-  },
-];
+export const appRoutes: Route[] = [...authRoutes, ...dashboardRoutes];
