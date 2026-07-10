@@ -94,7 +94,10 @@
 
   @if (isLinkMode()) {
     <p class="layout-link-hint">
-      {{ linkModeStatus() || 'Select a table, then click another table to link or unlink.' }}
+      {{
+        linkModeStatus() ||
+          'Select a table, then click another table to link or unlink.'
+      }}
     </p>
   }
 </section>
