@@ -184,11 +184,11 @@ export class ShapeDetailDialogComponent {
       : `Room ${roomNumber}`;
   }
 
-  protected roomArrivalDate(roomNumber: number): string {
+  protected roomArrivalDateText(roomNumber: number): string {
     return this.roomOptionByNumber(roomNumber)?.arrivalDate ?? '—';
   }
 
-  protected roomDepartureDate(roomNumber: number): string {
+  protected roomDepartureDateText(roomNumber: number): string {
     return this.roomOptionByNumber(roomNumber)?.departureDate ?? '—';
   }
 
