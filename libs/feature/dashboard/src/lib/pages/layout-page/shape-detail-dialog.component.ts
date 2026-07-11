@@ -449,7 +449,7 @@ export class ShapeDetailDialogComponent {
         if (
           arrivalDate === room.arrivalDate &&
           departureDate === room.departureDate &&
-          note === (room.note ?? null)
+          note === (room.note?.trim() || null)
         ) {
           return;
         }
@@ -475,7 +475,7 @@ export class ShapeDetailDialogComponent {
           return;
         }
 
-        if (room.arrivalDate == null && room.departureDate == null && room.note == null) {
+        if (room.arrivalDate === null && room.departureDate === null && room.note === null) {
           return;
         }
 
