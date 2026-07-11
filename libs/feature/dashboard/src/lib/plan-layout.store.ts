@@ -7,6 +7,7 @@ import {
   PlanItemType,
 } from './floor-planner.api';
 import { nextGeneratedTableNumber, normalizeTableNumber } from './table-number';
+import { normalizeRoomNumbers, primaryRoomNumber } from './room-assignment';
 
 export interface PlanItem {
   id: string;
@@ -18,6 +19,7 @@ export interface PlanItem {
   text: string;
   tableNumber: string | null;
   roomNumber: number | null;
+  roomNumbers: number[];
   linkedTableIds: string[];
 }
 
@@ -106,6 +108,8 @@ export class PlanLayoutStore {
   }
 
   private toModel(item: PlanItemDto): PlanItem {
+    const roomNumbers = normalizeRoomNumbers(item.roomNumbers, item.roomNumber);
+
     return {
       id: item.id,
       type: item.type,
@@ -115,7 +119,8 @@ export class PlanLayoutStore {
       height: Number(item.height),
       text: String(item.text ?? ''),
       tableNumber: normalizeTableNumber(item.tableNumber),
-      roomNumber: item.roomNumber,
+      roomNumber: primaryRoomNumber(roomNumbers),
+      roomNumbers,
       linkedTableIds: item.linkedTableIds ?? [],
     };
   }
@@ -137,6 +142,7 @@ export class PlanLayoutStore {
       text: type === 'column' ? 'Column' : '',
       tableNumber: type === 'table' ? nextTableNumber : null,
       roomNumber: null,
+      roomNumbers: [],
       linkedTableIds: [],
     };
   }

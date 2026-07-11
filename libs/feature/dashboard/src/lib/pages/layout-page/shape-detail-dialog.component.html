@@ -30,12 +30,12 @@
 
   @if (selectedItem.type === 'table') {
     <mat-form-field appearance="outline">
-      <mat-label>Linked room</mat-label>
+      <mat-label>Linked rooms</mat-label>
       <mat-select
+        multiple
         [value]="roomSelectionValue()"
-        (selectionChange)="onRoomSelectionChange(($event.value ?? '') + '')"
+        (selectionChange)="onRoomSelectionChange($event.value ?? [])"
       >
-        <mat-option value="">Unassigned</mat-option>
         @for (group of groupedRooms(); track group.floorNumber) {
           <mat-optgroup [label]="'Floor ' + group.floorNumber">
             @for (room of group.rooms; track room.roomId) {
@@ -46,7 +46,10 @@
           </mat-optgroup>
         }
       </mat-select>
-      <mat-hint>Select a room grouped by floor.</mat-hint>
+      <mat-hint
+        >Select one or more rooms. Rooms linked to other tables are
+        hidden.</mat-hint
+      >
     </mat-form-field>
 
     <mat-form-field appearance="outline">
@@ -88,7 +91,11 @@
         </mat-form-field>
       } @else {
         <p class="shape-detail-dialog-muted">
-          Link a room to edit arrival and leaving dates.
+          @if (hasMultipleLinkedRooms()) {
+            Select a single linked room to edit arrival and leaving dates.
+          } @else {
+            Link a room to edit arrival and leaving dates.
+          }
         </p>
       }
     </div>

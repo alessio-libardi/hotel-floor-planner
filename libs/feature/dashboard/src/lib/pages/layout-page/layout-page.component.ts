@@ -27,6 +27,7 @@ import {
   compareTableNumbers,
   nextGeneratedTableNumber,
 } from '../../table-number';
+import { formatTableRoomLabel } from '../../room-assignment';
 import {
   ShapeDetailDialogComponent,
   ShapeDetailDialogData,
@@ -60,6 +61,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   protected readonly selectedItem = signal<PlanItem | null>(null);
   protected roomOptions: ShapeDetailRoomOption[] = [];
+  private roomOptionsByNumber = new Map<number, ShapeDetailRoomOption>();
   protected readonly isPanMode = signal(true);
   protected readonly isLinkMode = signal(false);
   protected readonly linkModeStatus = signal<string>('');
@@ -93,6 +95,9 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     this.floorsSub = this.floorStore.floors$.subscribe((floors) => {
       this.roomOptions = this.extractRooms(floors);
+      this.roomOptionsByNumber = new Map(
+        this.roomOptions.map((room) => [room.roomNumber, room])
+      );
       this.renderItems();
     });
 
@@ -451,7 +456,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
           y: item.height / 2 - 8,
           width: item.width,
           align: 'center',
-          text: this.tableRoomLabel(item.roomNumber),
+          text: this.tableRoomLabel(item.roomNumbers),
           fontSize: 13,
           fill: this.itemTextColor(item),
           listening: false,
@@ -775,7 +780,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   private itemFillColor(item: PlanItem): string {
     if (item.type === 'table') {
-      const status = this.assignedRoomStatus(item.roomNumber);
+      const status = this.assignedRoomStatus(item.roomNumbers);
 
       if (status === 'expired') {
         return '#fee2e2';
@@ -794,27 +799,39 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       return '#0f172a';
     }
 
-    const status = this.assignedRoomStatus(item.roomNumber);
+    const status = this.assignedRoomStatus(item.roomNumbers);
     return status === 'tomorrow' ? TOMORROW_HIGHLIGHT_FOREGROUND : '#0f172a';
   }
 
-  private tableRoomLabel(roomNumber: number | null): string {
-    return roomNumber != null ? `Room ${roomNumber}` : '';
+  private tableRoomLabel(roomNumbers: number[]): string {
+    return formatTableRoomLabel(roomNumbers);
   }
 
   private hasTableNote(item: PlanItem): boolean {
     return item.type === 'table' && item.text.trim().length > 0;
   }
 
-  private assignedRoomStatus(roomNumber: number | null): RoomDepartureStatus {
-    if (roomNumber == null) {
+  private assignedRoomStatus(roomNumbers: number[]): RoomDepartureStatus {
+    if (roomNumbers.length === 0) {
       return 'none';
     }
 
-    const room = this.roomOptions.find(
-      (entry) => entry.roomNumber === roomNumber
-    );
-    return getRoomDepartureStatus(room?.departureDate ?? null);
+    let status: RoomDepartureStatus = 'none';
+
+    for (const roomNumber of roomNumbers) {
+      const room = this.roomOptionsByNumber.get(roomNumber);
+      const nextStatus = getRoomDepartureStatus(room?.departureDate ?? null);
+
+      if (nextStatus === 'expired') {
+        return 'expired';
+      }
+
+      if (nextStatus === 'tomorrow') {
+        status = 'tomorrow';
+      }
+    }
+
+    return status;
   }
 
   private async syncLinkedTableNumbers(anchorTableId: string): Promise<void> {
