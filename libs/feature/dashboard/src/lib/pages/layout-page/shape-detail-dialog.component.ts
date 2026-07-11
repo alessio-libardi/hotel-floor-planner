@@ -35,6 +35,8 @@ export interface ShapeDetailDialogData {
   roomOptions: ShapeDetailRoomOption[];
 }
 
+const SINGLE_LINKED_ROOM_COUNT = 1;
+
 @Component({
   selector: 'app-shape-detail-dialog',
   imports: [
@@ -187,7 +189,8 @@ export class ShapeDetailDialogComponent {
 
   protected canEditRoomDates(): boolean {
     return (
-      this.selectedItem.type === 'table' && this.draftRoomNumbers.length === 1
+      this.selectedItem.type === 'table' &&
+      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
     );
   }
 
@@ -350,6 +353,7 @@ export class ShapeDetailDialogComponent {
 
   private async persistTableRoomAssignment(): Promise<void> {
     const roomNumbers = normalizeRoomNumbers(this.draftRoomNumbers);
+    const nextRoomNumberSet = new Set(roomNumbers);
 
     if (this.hasSameRoomNumbers(roomNumbers, this.selectedItem.roomNumbers)) {
       return;
@@ -359,13 +363,13 @@ export class ShapeDetailDialogComponent {
       (item) =>
         item.type === 'table' &&
         item.id !== this.selectedItem.id &&
-        item.roomNumbers.some((roomNumber) => roomNumbers.includes(roomNumber))
+        item.roomNumbers.some((roomNumber) => nextRoomNumberSet.has(roomNumber))
     );
 
     await Promise.all(
       conflictingTables.map(async (table) => {
         const nextRoomNumbers = table.roomNumbers.filter(
-          (roomNumber) => !roomNumbers.includes(roomNumber)
+          (roomNumber) => !nextRoomNumberSet.has(roomNumber)
         );
 
         await this.store.updateItem(table.id, {
@@ -488,7 +492,7 @@ export class ShapeDetailDialogComponent {
 
   private setDateRangeFromSelectedRooms(): void {
     const room =
-      this.draftRoomNumbers.length === 1
+      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
         ? this.roomOptionByNumber(this.draftRoomNumbers[0])
         : undefined;
 
@@ -501,10 +505,12 @@ export class ShapeDetailDialogComponent {
   }
 
   private hasSameRoomNumbers(left: number[], right: number[]): boolean {
-    return (
-      left.length === right.length &&
-      left.every((roomNumber, index) => roomNumber === right[index])
-    );
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    const rightSet = new Set(right);
+    return left.every((roomNumber) => rightSet.has(roomNumber));
   }
 
   private formatDateOnly(value: Date | null): string | null {

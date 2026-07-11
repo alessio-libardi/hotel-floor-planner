@@ -61,6 +61,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   protected readonly selectedItem = signal<PlanItem | null>(null);
   protected roomOptions: ShapeDetailRoomOption[] = [];
+  private roomOptionsByNumber = new Map<number, ShapeDetailRoomOption>();
   protected readonly isPanMode = signal(true);
   protected readonly isLinkMode = signal(false);
   protected readonly linkModeStatus = signal<string>('');
@@ -94,6 +95,9 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     this.floorsSub = this.floorStore.floors$.subscribe((floors) => {
       this.roomOptions = this.extractRooms(floors);
+      this.roomOptionsByNumber = new Map(
+        this.roomOptions.map((room) => [room.roomNumber, room])
+      );
       this.renderItems();
     });
 
@@ -815,9 +819,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     let status: RoomDepartureStatus = 'none';
 
     for (const roomNumber of roomNumbers) {
-      const room = this.roomOptions.find(
-        (entry) => entry.roomNumber === roomNumber
-      );
+      const room = this.roomOptionsByNumber.get(roomNumber);
       const nextStatus = getRoomDepartureStatus(room?.departureDate ?? null);
 
       if (nextStatus === 'expired') {
