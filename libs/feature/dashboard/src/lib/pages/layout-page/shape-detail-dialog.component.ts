@@ -90,7 +90,7 @@ export class ShapeDetailDialogComponent {
     this.draftRoomNumbers = [...this.selectedItem.roomNumbers];
 
     for (const roomNumber of this.draftRoomNumbers) {
-      this.stayRangeForRoom(roomNumber);
+      this.getOrCreateStayRangeForRoom(roomNumber);
     }
   }
 
@@ -173,7 +173,7 @@ export class ShapeDetailDialogComponent {
     const next = normalizeRoomNumbers(roomNumbers ?? []);
 
     for (const roomNumber of next) {
-      this.stayRangeForRoom(roomNumber);
+      this.getOrCreateStayRangeForRoom(roomNumber);
     }
 
     for (const existing of [...this.roomStayRanges.keys()]) {
@@ -186,11 +186,7 @@ export class ShapeDetailDialogComponent {
     this.selectedTabIndex.set(0);
   }
 
-  protected onTabChange(index: number): void {
-    this.selectedTabIndex.set(index);
-  }
-
-  protected stayRangeForRoom(roomNumber: number): RoomStayRange {
+  protected getOrCreateStayRangeForRoom(roomNumber: number): RoomStayRange {
     const existing = this.roomStayRanges.get(roomNumber);
     if (existing) {
       return existing;

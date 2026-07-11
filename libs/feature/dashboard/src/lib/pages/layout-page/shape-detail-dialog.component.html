@@ -66,7 +66,7 @@
     @if (draftRoomNumbers.length > 0) {
       <mat-tab-group
         [selectedIndex]="selectedTabIndex()"
-        (selectedIndexChange)="onTabChange($event)"
+        (selectedIndexChange)="selectedTabIndex.set($event)"
         animationDuration="0ms"
         aria-label="Linked rooms"
       >
@@ -77,7 +77,7 @@
                 <mat-label>Arrival and leaving date</mat-label>
                 <mat-date-range-input
                   [rangePicker]="picker"
-                  [formGroup]="stayRangeForRoom(roomNumber)"
+                  [formGroup]="getOrCreateStayRangeForRoom(roomNumber)"
                   [separator]="'-'"
                 >
                   <input
