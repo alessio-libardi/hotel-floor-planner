@@ -82,9 +82,12 @@
                 </mat-date-range-input>
                 <mat-datepicker-toggle matIconSuffix [for]="picker" />
                 <mat-date-range-picker #picker />
-                @if (attemptedSubmit && hasInvalidDateRangeForRoom(roomNumber)) {
+                @if (
+                  attemptedSubmit && hasInvalidDateRangeForRoom(roomNumber)
+                ) {
                   <mat-error
-                    >Leaving date cannot be earlier than arrival date.</mat-error
+                    >Leaving date cannot be earlier than arrival
+                    date.</mat-error
                   >
                 }
               </mat-form-field>

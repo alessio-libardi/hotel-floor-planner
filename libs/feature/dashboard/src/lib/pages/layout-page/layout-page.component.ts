@@ -813,7 +813,8 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       item.type === 'table' &&
       item.roomNumbers.some(
         (roomNumber) =>
-          (this.roomOptionsByNumber.get(roomNumber)?.note ?? '').trim().length > 0
+          (this.roomOptionsByNumber.get(roomNumber)?.note ?? '').trim().length >
+          0
       )
     );
   }

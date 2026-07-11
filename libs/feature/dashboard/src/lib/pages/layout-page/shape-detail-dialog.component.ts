@@ -475,7 +475,11 @@ export class ShapeDetailDialogComponent {
           return;
         }
 
-        if (room.arrivalDate === null && room.departureDate === null && room.note === null) {
+        if (
+          room.arrivalDate === null &&
+          room.departureDate === null &&
+          room.note === null
+        ) {
           return;
         }
 
