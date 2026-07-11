@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatNativeDateModule } from '@angular/material/core';
@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 import {
@@ -50,6 +51,7 @@ const SINGLE_LINKED_ROOM_COUNT = 1;
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatTabsModule,
   ],
   templateUrl: './shape-detail-dialog.component.html',
   styleUrls: ['./shape-detail-dialog.component.css'],
@@ -62,6 +64,7 @@ export class ShapeDetailDialogComponent {
   protected attemptedSubmit = false;
   protected isSaving = false;
   protected saveErrorMessage = '';
+  protected readonly selectedTabIndex = signal(0);
 
   protected readonly stayRange = new FormGroup({
     start: new FormControl<Date | null>(null),
@@ -166,7 +169,27 @@ export class ShapeDetailDialogComponent {
 
   protected onRoomSelectionChange(roomNumbers: number[] | null): void {
     this.draftRoomNumbers = normalizeRoomNumbers(roomNumbers ?? []);
+    this.selectedTabIndex.set(0);
     this.setDateRangeFromSelectedRooms();
+  }
+
+  protected onTabChange(index: number): void {
+    this.selectedTabIndex.set(index);
+  }
+
+  protected roomTabLabel(roomNumber: number): string {
+    const room = this.roomOptionByNumber(roomNumber);
+    return room
+      ? `Floor ${room.floorNumber} – Room ${room.roomNumber}`
+      : `Room ${roomNumber}`;
+  }
+
+  protected roomArrivalDate(roomNumber: number): string {
+    return this.roomOptionByNumber(roomNumber)?.arrivalDate ?? '—';
+  }
+
+  protected roomDepartureDate(roomNumber: number): string {
+    return this.roomOptionByNumber(roomNumber)?.departureDate ?? '—';
   }
 
   protected hasInvalidDateRange(): boolean {
