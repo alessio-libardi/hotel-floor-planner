@@ -5,6 +5,7 @@ export interface RoomViewModel {
   arrivalDate: string | null;
   departureDate: string | null;
   checkedDate: string | null;
+  note: string | null;
 }
 
 export interface FloorViewModel {

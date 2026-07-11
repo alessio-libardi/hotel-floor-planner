@@ -30,6 +30,7 @@ export interface ShapeDetailRoomOption {
   roomNumber: number;
   arrivalDate: string | null;
   departureDate: string | null;
+  note: string | null;
 }
 export interface ShapeDetailDialogData {
   item: PlanItem;
@@ -69,6 +70,7 @@ export class ShapeDetailDialogComponent {
   protected saveErrorMessage = '';
   protected readonly selectedTabIndex = signal(0);
   protected readonly roomStayRanges = new Map<number, RoomStayRange>();
+  protected readonly draftRoomNotes = new Map<number, string>();
 
   private readonly store = inject(PlanLayoutStore);
   private readonly floorStore = inject(FloorStore);
@@ -91,6 +93,8 @@ export class ShapeDetailDialogComponent {
 
     for (const roomNumber of this.draftRoomNumbers) {
       this.getOrCreateStayRangeForRoom(roomNumber);
+      const room = this.roomOptionByNumber(roomNumber);
+      this.draftRoomNotes.set(roomNumber, room?.note ?? '');
     }
   }
 
@@ -114,8 +118,12 @@ export class ShapeDetailDialogComponent {
       : this.draftLabel;
   }
 
-  protected noteValue(): string {
-    return this.draftLabel;
+  protected noteValue(roomNumber: number): string {
+    return this.draftRoomNotes.get(roomNumber) ?? '';
+  }
+
+  protected onNoteInput(roomNumber: number, value: string): void {
+    this.draftRoomNotes.set(roomNumber, value);
   }
 
   protected onPrimaryFieldInput(value: string): void {
@@ -124,10 +132,6 @@ export class ShapeDetailDialogComponent {
       return;
     }
 
-    this.draftLabel = value;
-  }
-
-  protected onNoteInput(value: string): void {
     this.draftLabel = value;
   }
 
@@ -174,11 +178,16 @@ export class ShapeDetailDialogComponent {
 
     for (const roomNumber of next) {
       this.getOrCreateStayRangeForRoom(roomNumber);
+      if (!this.draftRoomNotes.has(roomNumber)) {
+        const room = this.roomOptionByNumber(roomNumber);
+        this.draftRoomNotes.set(roomNumber, room?.note ?? '');
+      }
     }
 
     for (const existing of [...this.roomStayRanges.keys()]) {
       if (!next.includes(existing)) {
         this.roomStayRanges.delete(existing);
+        this.draftRoomNotes.delete(existing);
       }
     }
 
@@ -291,14 +300,8 @@ export class ShapeDetailDialogComponent {
           });
         }
 
-        if (this.draftLabel !== this.selectedItem.text) {
-          await this.store.updateItem(this.selectedItem.id, {
-            text: this.draftLabel,
-          });
-        }
-
         await this.persistTableRoomAssignment();
-        await this.persistRoomDateRange();
+        await this.persistRoomDetails();
       }
 
       this.dialogRef.close({ saved: true });
@@ -384,7 +387,6 @@ export class ShapeDetailDialogComponent {
         linkedTableIds: [],
         roomNumber: null,
         roomNumbers: [],
-        text: '',
         tableNumber: resetTableNumber,
       });
 
@@ -431,20 +433,23 @@ export class ShapeDetailDialogComponent {
     });
   }
 
-  private async persistRoomDateRange(): Promise<void> {
+  private async persistRoomDetails(): Promise<void> {
     await Promise.all(
-      [...this.roomStayRanges.entries()].map(async ([roomNumber, fg]) => {
+      [...this.roomStayRanges.keys()].map(async (roomNumber) => {
         const room = this.roomOptionByNumber(roomNumber);
         if (!room) {
           return;
         }
 
+        const fg = this.roomStayRanges.get(roomNumber)!;
         const arrivalDate = this.formatDateOnly(fg.controls.start.value);
         const departureDate = this.formatDateOnly(fg.controls.end.value);
+        const note = (this.draftRoomNotes.get(roomNumber) ?? '').trim() || null;
 
         if (
           arrivalDate === room.arrivalDate &&
-          departureDate === room.departureDate
+          departureDate === room.departureDate &&
+          note === (room.note ?? null)
         ) {
           return;
         }
@@ -452,6 +457,7 @@ export class ShapeDetailDialogComponent {
         await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
           arrivalDate,
           departureDate,
+          note,
         });
       })
     );
@@ -469,13 +475,14 @@ export class ShapeDetailDialogComponent {
           return;
         }
 
-        if (room.arrivalDate == null && room.departureDate == null) {
+        if (room.arrivalDate == null && room.departureDate == null && room.note == null) {
           return;
         }
 
         await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
           arrivalDate: null,
           departureDate: null,
+          note: null,
         });
       })
     );

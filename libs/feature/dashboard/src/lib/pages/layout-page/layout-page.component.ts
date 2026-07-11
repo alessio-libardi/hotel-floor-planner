@@ -606,6 +606,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         roomNumber: room.number,
         arrivalDate: room.arrivalDate,
         departureDate: room.departureDate,
+        note: room.note,
       }))
     );
   }
@@ -808,7 +809,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private hasTableNote(item: PlanItem): boolean {
-    return item.type === 'table' && item.text.trim().length > 0;
+    return (
+      item.type === 'table' &&
+      item.roomNumbers.some(
+        (roomNumber) =>
+          (this.roomOptionsByNumber.get(roomNumber)?.note ?? '').trim().length > 0
+      )
+    );
   }
 
   private assignedRoomStatus(roomNumbers: number[]): RoomDepartureStatus {

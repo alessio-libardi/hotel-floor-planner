@@ -47,12 +47,15 @@
                 handleRoomClick(
                   room.id,
                   room.number,
-                  noteForRoom(vm.roomToTableMap, room.number),
+                  noteForRoom(vm.roomNoteMap, room.number),
                   $event
                 )
               "
             >
               <div matListItemTitle>Room {{ room.number }}</div>
+              @if (noteForRoom(vm.roomNoteMap, room.number); as roomNote) {
+                <span matListItemLine class="seating-room-note">{{ roomNote }}</span>
+              }
               <span matListItemMeta class="seating-room-meta">
                 @if (isCheckedToday(room.checkedDate, vm.today)) {
                   <span

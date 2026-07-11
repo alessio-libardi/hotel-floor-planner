@@ -46,6 +46,7 @@ interface RoomDoc {
   arrivalDate: string | null;
   departureDate: string | null;
   checkedDate: string | null;
+  note?: string | null;
 }
 
 interface FloorDoc {
@@ -94,7 +95,7 @@ export class FloorPlannerApi {
   updateRoomDetails(
     floorId: string,
     roomId: string,
-    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
+    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate' | 'note'>
   ) {
     return from(this.updateRoomDetailsInternal(floorId, roomId, details));
   }
@@ -218,6 +219,7 @@ export class FloorPlannerApi {
         arrivalDate: null,
         departureDate: null,
         checkedDate: null,
+        note: null,
       };
 
       transaction.update(floorRef, { rooms: [...rooms, nextRoom] });
@@ -229,6 +231,7 @@ export class FloorPlannerApi {
         arrivalDate: nextRoom.arrivalDate,
         departureDate: nextRoom.departureDate,
         checkedDate: nextRoom.checkedDate,
+        note: nextRoom.note ?? null,
       };
     });
   }
@@ -271,6 +274,7 @@ export class FloorPlannerApi {
         arrivalDate: updatedRoom.arrivalDate,
         departureDate: updatedRoom.departureDate,
         checkedDate: updatedRoom.checkedDate,
+        note: updatedRoom.note ?? null,
       };
     });
   }
@@ -304,7 +308,7 @@ export class FloorPlannerApi {
   private async updateRoomDetailsInternal(
     floorId: string,
     roomId: string,
-    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
+    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate' | 'note'>
   ): Promise<RoomViewModel> {
     this.auth.requireUser();
 
@@ -328,6 +332,7 @@ export class FloorPlannerApi {
         ...rooms[roomIndex],
         arrivalDate: details.arrivalDate,
         departureDate: details.departureDate,
+        note: details.note,
       };
 
       rooms[roomIndex] = updatedRoom;
@@ -340,6 +345,7 @@ export class FloorPlannerApi {
         arrivalDate: updatedRoom.arrivalDate,
         departureDate: updatedRoom.departureDate,
         checkedDate: updatedRoom.checkedDate,
+        note: updatedRoom.note ?? null,
       };
     });
   }
@@ -382,6 +388,7 @@ export class FloorPlannerApi {
         arrivalDate: updatedRoom.arrivalDate,
         departureDate: updatedRoom.departureDate,
         checkedDate: updatedRoom.checkedDate,
+        note: updatedRoom.note ?? null,
       };
     });
   }
@@ -546,6 +553,7 @@ export class FloorPlannerApi {
         arrivalDate: room.arrivalDate ?? null,
         departureDate: room.departureDate ?? null,
         checkedDate: room.checkedDate ?? null,
+        note: room.note ?? null,
       }));
 
     return {
