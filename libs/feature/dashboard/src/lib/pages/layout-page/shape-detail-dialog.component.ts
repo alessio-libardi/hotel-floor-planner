@@ -36,7 +36,10 @@ export interface ShapeDetailDialogData {
   roomOptions: ShapeDetailRoomOption[];
 }
 
-const SINGLE_LINKED_ROOM_COUNT = 1;
+type RoomStayRange = FormGroup<{
+  start: FormControl<Date | null>;
+  end: FormControl<Date | null>;
+}>;
 
 @Component({
   selector: 'app-shape-detail-dialog',
@@ -65,11 +68,7 @@ export class ShapeDetailDialogComponent {
   protected isSaving = false;
   protected saveErrorMessage = '';
   protected readonly selectedTabIndex = signal(0);
-
-  protected readonly stayRange = new FormGroup({
-    start: new FormControl<Date | null>(null),
-    end: new FormControl<Date | null>(null),
-  });
+  protected readonly roomStayRanges = new Map<number, RoomStayRange>();
 
   private readonly store = inject(PlanLayoutStore);
   private readonly floorStore = inject(FloorStore);
@@ -89,7 +88,10 @@ export class ShapeDetailDialogComponent {
         ? `${this.selectedItem.tableNumber}`
         : '';
     this.draftRoomNumbers = [...this.selectedItem.roomNumbers];
-    this.setDateRangeFromSelectedRooms();
+
+    for (const roomNumber of this.draftRoomNumbers) {
+      this.stayRangeForRoom(roomNumber);
+    }
   }
 
   protected primaryFieldLabel(): string {
@@ -168,33 +170,53 @@ export class ShapeDetailDialogComponent {
   }
 
   protected onRoomSelectionChange(roomNumbers: number[] | null): void {
-    this.draftRoomNumbers = normalizeRoomNumbers(roomNumbers ?? []);
+    const next = normalizeRoomNumbers(roomNumbers ?? []);
+
+    for (const roomNumber of next) {
+      this.stayRangeForRoom(roomNumber);
+    }
+
+    for (const existing of [...this.roomStayRanges.keys()]) {
+      if (!next.includes(existing)) {
+        this.roomStayRanges.delete(existing);
+      }
+    }
+
+    this.draftRoomNumbers = next;
     this.selectedTabIndex.set(0);
-    this.setDateRangeFromSelectedRooms();
   }
 
   protected onTabChange(index: number): void {
     this.selectedTabIndex.set(index);
   }
 
-  protected roomTabLabel(roomNumber: number): string {
-    const room = this.roomOptionByNumber(roomNumber);
-    return room
-      ? `Floor ${room.floorNumber} – Room ${room.roomNumber}`
-      : `Room ${roomNumber}`;
+  protected stayRangeForRoom(roomNumber: number): RoomStayRange {
+    if (!this.roomStayRanges.has(roomNumber)) {
+      const room = this.roomOptionByNumber(roomNumber);
+      this.roomStayRanges.set(
+        roomNumber,
+        new FormGroup({
+          start: new FormControl<Date | null>(
+            this.toDateOnly(room?.arrivalDate ?? null)
+          ),
+          end: new FormControl<Date | null>(
+            this.toDateOnly(room?.departureDate ?? null)
+          ),
+        })
+      );
+    }
+
+    return this.roomStayRanges.get(roomNumber)!;
   }
 
-  protected roomArrivalDateText(roomNumber: number): string {
-    return this.roomOptionByNumber(roomNumber)?.arrivalDate ?? '—';
-  }
+  protected hasInvalidDateRangeForRoom(roomNumber: number): boolean {
+    const fg = this.roomStayRanges.get(roomNumber);
+    if (!fg) {
+      return false;
+    }
 
-  protected roomDepartureDateText(roomNumber: number): string {
-    return this.roomOptionByNumber(roomNumber)?.departureDate ?? '—';
-  }
-
-  protected hasInvalidDateRange(): boolean {
-    const start = this.stayRange.controls.start.value;
-    const end = this.stayRange.controls.end.value;
+    const start = fg.controls.start.value;
+    const end = fg.controls.end.value;
 
     if (!start || !end) {
       return false;
@@ -210,17 +232,21 @@ export class ShapeDetailDialogComponent {
     return endDate < startDate;
   }
 
-  protected canEditRoomDates(): boolean {
-    return (
-      this.selectedItem.type === 'table' &&
-      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
-    );
+  protected roomTabLabel(roomNumber: number): string {
+    const room = this.roomOptionByNumber(roomNumber);
+    return room
+      ? `Floor ${room.floorNumber} – Room ${room.roomNumber}`
+      : `Room ${roomNumber}`;
   }
 
-  protected hasMultipleLinkedRooms(): boolean {
-    return (
-      this.selectedItem.type === 'table' && this.draftRoomNumbers.length > 1
-    );
+  protected hasInvalidDateRange(): boolean {
+    for (const roomNumber of this.draftRoomNumbers) {
+      if (this.hasInvalidDateRangeForRoom(roomNumber)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   protected saveButtonDisabled(): boolean {
@@ -409,36 +435,28 @@ export class ShapeDetailDialogComponent {
   }
 
   private async persistRoomDateRange(): Promise<void> {
-    if (this.draftRoomNumbers.length !== 1) {
-      return;
-    }
+    await Promise.all(
+      [...this.roomStayRanges.entries()].map(async ([roomNumber, fg]) => {
+        const room = this.roomOptionByNumber(roomNumber);
+        if (!room) {
+          return;
+        }
 
-    const selectedRoom = this.roomOptionByNumber(this.draftRoomNumbers[0]);
-    if (!selectedRoom) {
-      return;
-    }
+        const arrivalDate = this.formatDateOnly(fg.controls.start.value);
+        const departureDate = this.formatDateOnly(fg.controls.end.value);
 
-    const arrivalDate = this.formatDateOnly(
-      this.stayRange.controls.start.value
-    );
-    const departureDate = this.formatDateOnly(
-      this.stayRange.controls.end.value
-    );
+        if (
+          arrivalDate === room.arrivalDate &&
+          departureDate === room.departureDate
+        ) {
+          return;
+        }
 
-    if (
-      arrivalDate === selectedRoom.arrivalDate &&
-      departureDate === selectedRoom.departureDate
-    ) {
-      return;
-    }
-
-    await this.floorStore.updateRoomDetails(
-      selectedRoom.floorId,
-      selectedRoom.roomId,
-      {
-        arrivalDate,
-        departureDate,
-      }
+        await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
+          arrivalDate,
+          departureDate,
+        });
+      })
     );
   }
 
@@ -510,20 +528,6 @@ export class ShapeDetailDialogComponent {
       (room) =>
         selectedRoomNumbers.has(room.roomNumber) ||
         !assignedRoomNumbers.has(room.roomNumber)
-    );
-  }
-
-  private setDateRangeFromSelectedRooms(): void {
-    const room =
-      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
-        ? this.roomOptionByNumber(this.draftRoomNumbers[0])
-        : undefined;
-
-    this.stayRange.controls.start.setValue(
-      this.toDateOnly(room?.arrivalDate ?? null)
-    );
-    this.stayRange.controls.end.setValue(
-      this.toDateOnly(room?.departureDate ?? null)
     );
   }
 

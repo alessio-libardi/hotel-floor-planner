@@ -52,79 +52,69 @@
       >
     </mat-form-field>
 
-    <mat-form-field appearance="outline">
-      <mat-label>Note</mat-label>
-      <textarea
-        matInput
-        rows="3"
-        [value]="noteValue()"
-        (input)="onNoteInput($any($event.target).value)"
-        placeholder="Add a note for this table"
-      ></textarea>
-    </mat-form-field>
+    @if (draftRoomNumbers.length > 0) {
+      <mat-tab-group
+        [selectedIndex]="selectedTabIndex()"
+        (selectedIndexChange)="onTabChange($event)"
+        animationDuration="0ms"
+        aria-label="Linked rooms"
+      >
+        @for (roomNumber of draftRoomNumbers; track roomNumber) {
+          <mat-tab [label]="roomTabLabel(roomNumber)">
+            <div class="shape-detail-dialog-tab-content" aria-live="polite">
+              <mat-form-field appearance="outline">
+                <mat-label>Note</mat-label>
+                <textarea
+                  matInput
+                  rows="3"
+                  [value]="noteValue()"
+                  (input)="onNoteInput($any($event.target).value)"
+                  placeholder="Add a note for this table"
+                ></textarea>
+              </mat-form-field>
 
-    <div class="shape-detail-dialog-section">
-      <p class="shape-detail-dialog-section-title">Stay period</p>
-
-      @if (draftRoomNumbers.length > 0) {
-        <mat-tab-group
-          [selectedIndex]="selectedTabIndex()"
-          (selectedIndexChange)="onTabChange($event)"
-          animationDuration="0ms"
-          aria-label="Linked rooms"
-        >
-          @for (roomNumber of draftRoomNumbers; track roomNumber) {
-            <mat-tab [label]="roomTabLabel(roomNumber)">
-              <div class="shape-detail-dialog-tab-content" aria-live="polite">
-                @if (draftRoomNumbers.length === 1) {
-                  <mat-form-field appearance="outline">
-                    <mat-label>Arrival and leaving date</mat-label>
-                    <mat-date-range-input
-                      [rangePicker]="picker"
-                      [formGroup]="stayRange"
-                      [separator]="'-'"
-                    >
-                      <input
-                        matStartDate
-                        formControlName="start"
-                        placeholder="Arrival"
-                      />
-                      <input
-                        matEndDate
-                        formControlName="end"
-                        placeholder="Leaving"
-                      />
-                    </mat-date-range-input>
-                    <mat-datepicker-toggle matIconSuffix [for]="picker" />
-                    <mat-date-range-picker #picker />
-                    @if (attemptedSubmit && hasInvalidDateRange()) {
-                      <mat-error
-                        >Leaving date cannot be earlier than arrival
-                        date.</mat-error
-                      >
-                    }
-                  </mat-form-field>
-                } @else {
-                  <dl class="shape-detail-dialog-dates">
-                    <dt>Arrival</dt>
-                    <dd>{{ roomArrivalDateText(roomNumber) }}</dd>
-                    <dt>Leaving</dt>
-                    <dd>{{ roomDepartureDateText(roomNumber) }}</dd>
-                  </dl>
-                  <p class="shape-detail-dialog-muted">
-                    Dates can only be edited when a single room is linked.
-                  </p>
+              <mat-form-field appearance="outline">
+                <mat-label>Arrival and leaving date</mat-label>
+                <mat-date-range-input
+                  [rangePicker]="picker"
+                  [formGroup]="stayRangeForRoom(roomNumber)"
+                  [separator]="'-'"
+                >
+                  <input
+                    matStartDate
+                    formControlName="start"
+                    placeholder="Arrival"
+                  />
+                  <input
+                    matEndDate
+                    formControlName="end"
+                    placeholder="Leaving"
+                  />
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="picker" />
+                <mat-date-range-picker #picker />
+                @if (attemptedSubmit && hasInvalidDateRangeForRoom(roomNumber)) {
+                  <mat-error
+                    >Leaving date cannot be earlier than arrival date.</mat-error
+                  >
                 }
-              </div>
-            </mat-tab>
-          }
-        </mat-tab-group>
-      } @else {
-        <p class="shape-detail-dialog-muted">
-          Link a room to edit arrival and leaving dates.
-        </p>
-      }
-    </div>
+              </mat-form-field>
+            </div>
+          </mat-tab>
+        }
+      </mat-tab-group>
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Note</mat-label>
+        <textarea
+          matInput
+          rows="3"
+          [value]="noteValue()"
+          (input)="onNoteInput($any($event.target).value)"
+          placeholder="Add a note for this table"
+        ></textarea>
+      </mat-form-field>
+    }
   }
 
   <p class="shape-detail-dialog-muted">

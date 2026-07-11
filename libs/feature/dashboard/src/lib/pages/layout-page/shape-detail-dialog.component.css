@@ -54,23 +54,6 @@
   width: 100%;
 }
 
-.shape-detail-dialog-dates {
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 1rem;
-  font-size: 0.875rem;
-}
-
-.shape-detail-dialog-dates dt {
-  font-weight: 600;
-  color: var(--mat-sys-on-surface-variant);
-}
-
-.shape-detail-dialog-dates dd {
-  margin: 0;
-}
-
 .shape-detail-dialog-spacer {
   flex: 1 1 auto;
 }
