@@ -52,17 +52,6 @@
       >
     </mat-form-field>
 
-    <mat-form-field appearance="outline">
-      <mat-label>Note</mat-label>
-      <textarea
-        matInput
-        rows="3"
-        [value]="noteValue()"
-        (input)="onNoteInput($any($event.target).value)"
-        placeholder="Add a note for this table"
-      ></textarea>
-    </mat-form-field>
-
     @if (draftRoomNumbers.length > 0) {
       <mat-tab-group
         [selectedIndex]="selectedTabIndex()"
@@ -104,6 +93,17 @@
         }
       </mat-tab-group>
     }
+
+    <mat-form-field appearance="outline">
+      <mat-label>Note</mat-label>
+      <textarea
+        matInput
+        rows="3"
+        [value]="noteValue()"
+        (input)="onNoteInput($any($event.target).value)"
+        placeholder="Add a note for this table"
+      ></textarea>
+    </mat-form-field>
   }
 
   <p class="shape-detail-dialog-muted">
