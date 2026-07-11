@@ -71,6 +71,7 @@
           [selectedIndex]="selectedTabIndex()"
           (selectedIndexChange)="onTabChange($event)"
           animationDuration="0ms"
+          aria-label="Linked rooms"
         >
           @for (roomNumber of draftRoomNumbers; track roomNumber) {
             <mat-tab [label]="roomTabLabel(roomNumber)">
@@ -110,7 +111,7 @@
                     <dt>Leaving</dt>
                     <dd>{{ roomDepartureDateText(roomNumber) }}</dd>
                   </dl>
-                  <p class="shape-detail-dialog-muted">
+                  <p class="shape-detail-dialog-muted" aria-live="polite">
                     Dates can only be edited when a single room is linked.
                   </p>
                 }
