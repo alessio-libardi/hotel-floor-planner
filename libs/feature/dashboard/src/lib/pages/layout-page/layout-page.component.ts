@@ -799,7 +799,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private tableRoomLabel(roomNumber: number | null): string {
-    return roomNumber != null ? `Room ${roomNumber}` : 'No room';
+    return roomNumber != null ? `Room ${roomNumber}` : '';
   }
 
   private hasTableNote(item: PlanItem): boolean {
