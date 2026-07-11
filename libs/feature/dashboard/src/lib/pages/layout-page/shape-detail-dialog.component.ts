@@ -15,6 +15,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
+import {
+  formatTableRoomLabel,
+  normalizeRoomNumbers,
+  primaryRoomNumber,
+} from '../../room-assignment';
 import { nextGeneratedTableNumber } from '../../table-number';
 
 export interface ShapeDetailRoomOption {
@@ -51,7 +56,7 @@ export class ShapeDetailDialogComponent {
   protected readonly selectedItem: PlanItem;
   protected draftLabel = '';
   protected draftTableNumber = '';
-  protected draftRoomNumber: number | null = null;
+  protected draftRoomNumbers: number[] = [];
   protected attemptedSubmit = false;
   protected isSaving = false;
   protected saveErrorMessage = '';
@@ -67,15 +72,19 @@ export class ShapeDetailDialogComponent {
   protected readonly data = inject<ShapeDetailDialogData>(MAT_DIALOG_DATA);
 
   constructor() {
-    this.selectedItem = { ...this.data.item };
+    this.selectedItem = {
+      ...this.data.item,
+      roomNumbers: [...this.data.item.roomNumbers],
+      linkedTableIds: [...this.data.item.linkedTableIds],
+    };
 
     this.draftLabel = this.selectedItem.text;
     this.draftTableNumber =
       this.selectedItem.tableNumber != null
         ? `${this.selectedItem.tableNumber}`
         : '';
-    this.draftRoomNumber = this.selectedItem.roomNumber;
-    this.setDateRangeFromRoom(this.draftRoomNumber);
+    this.draftRoomNumbers = [...this.selectedItem.roomNumbers];
+    this.setDateRangeFromSelectedRooms();
   }
 
   protected primaryFieldLabel(): string {
@@ -130,7 +139,7 @@ export class ShapeDetailDialogComponent {
   }> {
     const grouped = new Map<number, ShapeDetailRoomOption[]>();
 
-    for (const room of this.data.roomOptions) {
+    for (const room of this.availableRoomOptions()) {
       const existing = grouped.get(room.floorNumber);
       if (existing) {
         existing.push(room);
@@ -149,14 +158,13 @@ export class ShapeDetailDialogComponent {
       }));
   }
 
-  protected roomSelectionValue(): number | '' {
-    return this.draftRoomNumber ?? '';
+  protected roomSelectionValue(): number[] {
+    return this.draftRoomNumbers;
   }
 
-  protected onRoomSelectionChange(roomNumberValue: string): void {
-    const roomNumber = roomNumberValue ? Number(roomNumberValue) : null;
-    this.draftRoomNumber = Number.isNaN(roomNumber) ? null : roomNumber;
-    this.setDateRangeFromRoom(this.draftRoomNumber);
+  protected onRoomSelectionChange(roomNumbers: number[] | null): void {
+    this.draftRoomNumbers = normalizeRoomNumbers(roomNumbers ?? []);
+    this.setDateRangeFromSelectedRooms();
   }
 
   protected hasInvalidDateRange(): boolean {
@@ -178,7 +186,15 @@ export class ShapeDetailDialogComponent {
   }
 
   protected canEditRoomDates(): boolean {
-    return this.selectedItem.type === 'table' && this.draftRoomNumber != null;
+    return (
+      this.selectedItem.type === 'table' && this.draftRoomNumbers.length === 1
+    );
+  }
+
+  protected hasMultipleLinkedRooms(): boolean {
+    return (
+      this.selectedItem.type === 'table' && this.draftRoomNumbers.length > 1
+    );
   }
 
   protected saveButtonDisabled(): boolean {
@@ -246,11 +262,18 @@ export class ShapeDetailDialogComponent {
   }
 
   protected linkedRoomSummary(): string {
-    if (this.selectedItem.type !== 'table' || this.draftRoomNumber == null) {
+    if (
+      this.selectedItem.type !== 'table' ||
+      this.draftRoomNumbers.length === 0
+    ) {
       return 'No room linked';
     }
 
-    const room = this.roomOptionByNumber(this.draftRoomNumber);
+    if (this.draftRoomNumbers.length > 1) {
+      return formatTableRoomLabel(this.draftRoomNumbers);
+    }
+
+    const room = this.roomOptionByNumber(this.draftRoomNumbers[0]);
     return room
       ? `Floor ${room.floorNumber} - Room ${room.roomNumber}`
       : 'Linked room not found';
@@ -294,7 +317,7 @@ export class ShapeDetailDialogComponent {
         this.store.items.find((item) => item.id === this.selectedItem.id) ??
         this.selectedItem;
 
-      await this.clearRoomDates(currentTable.roomNumber);
+      await this.clearRoomDates(currentTable.roomNumbers);
       await this.unlinkTable(currentTable);
 
       const resetTableNumber =
@@ -311,6 +334,7 @@ export class ShapeDetailDialogComponent {
       await this.store.updateItem(currentTable.id, {
         linkedTableIds: [],
         roomNumber: null,
+        roomNumbers: [],
         text: '',
         tableNumber: resetTableNumber,
       });
@@ -325,36 +349,44 @@ export class ShapeDetailDialogComponent {
   }
 
   private async persistTableRoomAssignment(): Promise<void> {
-    const roomNumber = this.draftRoomNumber;
+    const roomNumbers = normalizeRoomNumbers(this.draftRoomNumbers);
 
-    if (roomNumber === this.selectedItem.roomNumber) {
+    if (this.hasSameRoomNumbers(roomNumbers, this.selectedItem.roomNumbers)) {
       return;
     }
 
-    const existing = roomNumber
-      ? this.store.items.find(
-          (item) =>
-            item.type === 'table' &&
-            item.id !== this.selectedItem.id &&
-            item.roomNumber === roomNumber
-        )
-      : undefined;
+    const conflictingTables = this.store.items.filter(
+      (item) =>
+        item.type === 'table' &&
+        item.id !== this.selectedItem.id &&
+        item.roomNumbers.some((roomNumber) => roomNumbers.includes(roomNumber))
+    );
 
-    if (existing) {
-      await this.store.updateItem(existing.id, { roomNumber: null });
-    }
+    await Promise.all(
+      conflictingTables.map(async (table) => {
+        const nextRoomNumbers = table.roomNumbers.filter(
+          (roomNumber) => !roomNumbers.includes(roomNumber)
+        );
+
+        await this.store.updateItem(table.id, {
+          roomNumber: primaryRoomNumber(nextRoomNumbers),
+          roomNumbers: nextRoomNumbers,
+        });
+      })
+    );
 
     await this.store.updateItem(this.selectedItem.id, {
-      roomNumber,
+      roomNumber: primaryRoomNumber(roomNumbers),
+      roomNumbers,
     });
   }
 
   private async persistRoomDateRange(): Promise<void> {
-    if (this.draftRoomNumber == null) {
+    if (this.draftRoomNumbers.length !== 1) {
       return;
     }
 
-    const selectedRoom = this.roomOptionByNumber(this.draftRoomNumber);
+    const selectedRoom = this.roomOptionByNumber(this.draftRoomNumbers[0]);
     if (!selectedRoom) {
       return;
     }
@@ -383,24 +415,28 @@ export class ShapeDetailDialogComponent {
     );
   }
 
-  private async clearRoomDates(roomNumber: number | null): Promise<void> {
-    if (roomNumber == null) {
+  private async clearRoomDates(roomNumbers: number[]): Promise<void> {
+    if (roomNumbers.length === 0) {
       return;
     }
 
-    const room = this.roomOptionByNumber(roomNumber);
-    if (!room) {
-      return;
-    }
+    await Promise.all(
+      roomNumbers.map(async (roomNumber) => {
+        const room = this.roomOptionByNumber(roomNumber);
+        if (!room) {
+          return;
+        }
 
-    if (room.arrivalDate == null && room.departureDate == null) {
-      return;
-    }
+        if (room.arrivalDate == null && room.departureDate == null) {
+          return;
+        }
 
-    await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
-      arrivalDate: null,
-      departureDate: null,
-    });
+        await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
+          arrivalDate: null,
+          departureDate: null,
+        });
+      })
+    );
   }
 
   private async unlinkTable(table: PlanItem): Promise<void> {
@@ -433,15 +469,41 @@ export class ShapeDetailDialogComponent {
     return this.data.roomOptions.find((room) => room.roomNumber === roomNumber);
   }
 
-  private setDateRangeFromRoom(roomNumber: number | null): void {
+  private availableRoomOptions(): ShapeDetailRoomOption[] {
+    const selectedRoomNumbers = new Set(this.draftRoomNumbers);
+    const assignedRoomNumbers = new Set(
+      this.store.items
+        .filter(
+          (item) => item.type === 'table' && item.id !== this.selectedItem.id
+        )
+        .flatMap((item) => item.roomNumbers)
+    );
+
+    return this.data.roomOptions.filter(
+      (room) =>
+        selectedRoomNumbers.has(room.roomNumber) ||
+        !assignedRoomNumbers.has(room.roomNumber)
+    );
+  }
+
+  private setDateRangeFromSelectedRooms(): void {
     const room =
-      roomNumber == null ? undefined : this.roomOptionByNumber(roomNumber);
+      this.draftRoomNumbers.length === 1
+        ? this.roomOptionByNumber(this.draftRoomNumbers[0])
+        : undefined;
 
     this.stayRange.controls.start.setValue(
       this.toDateOnly(room?.arrivalDate ?? null)
     );
     this.stayRange.controls.end.setValue(
       this.toDateOnly(room?.departureDate ?? null)
+    );
+  }
+
+  private hasSameRoomNumbers(left: number[], right: number[]): boolean {
+    return (
+      left.length === right.length &&
+      left.every((roomNumber, index) => roomNumber === right[index])
     );
   }
 

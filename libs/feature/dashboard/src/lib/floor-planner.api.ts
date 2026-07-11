@@ -21,6 +21,7 @@ import {
   nextGeneratedTableNumber,
   normalizeTableNumber,
 } from './table-number';
+import { normalizeRoomNumbers, primaryRoomNumber } from './room-assignment';
 
 export type PlanItemType = 'table' | 'column' | 'label';
 
@@ -34,6 +35,7 @@ export interface PlanItemDto {
   text: string;
   tableNumber: string | null;
   roomNumber: number | null;
+  roomNumbers: number[];
   linkedTableIds: string[];
 }
 
@@ -60,6 +62,7 @@ interface PlanItemDoc {
   text: string;
   tableNumber: string | null;
   roomNumber: number | null;
+  roomNumbers?: number[];
   linkedTableIds: string[];
 }
 
@@ -130,6 +133,7 @@ export class FloorPlannerApi {
         | 'text'
         | 'tableNumber'
         | 'roomNumber'
+        | 'roomNumbers'
         | 'linkedTableIds'
       >
     >
@@ -453,6 +457,7 @@ export class FloorPlannerApi {
         text: type === 'column' ? 'Column' : '',
         tableNumber: nextTableNumber,
         roomNumber: null,
+        roomNumbers: [],
         linkedTableIds: [],
       };
 
@@ -473,6 +478,7 @@ export class FloorPlannerApi {
         | 'text'
         | 'tableNumber'
         | 'roomNumber'
+        | 'roomNumbers'
         | 'linkedTableIds'
       >
     >
@@ -559,7 +565,10 @@ export class FloorPlannerApi {
       height: item.height,
       text: item.text,
       tableNumber: normalizeTableNumber(item.tableNumber),
-      roomNumber: item.roomNumber,
+      roomNumber: primaryRoomNumber(
+        normalizeRoomNumbers(item.roomNumbers, item.roomNumber)
+      ),
+      roomNumbers: normalizeRoomNumbers(item.roomNumbers, item.roomNumber),
       linkedTableIds: item.linkedTableIds ?? [],
     };
   }

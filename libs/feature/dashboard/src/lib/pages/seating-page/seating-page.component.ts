@@ -82,18 +82,16 @@ export class SeatingPageComponent {
       const roomToTableMap = new Map<number, RoomTableAssignment>();
 
       for (const item of items) {
-        if (
-          item.type !== 'table' ||
-          item.roomNumber == null ||
-          item.tableNumber == null
-        ) {
+        if (item.type !== 'table' || item.tableNumber == null) {
           continue;
         }
 
-        roomToTableMap.set(item.roomNumber, {
-          tableNumber: item.tableNumber,
-          note: item.text,
-        });
+        for (const roomNumber of item.roomNumbers) {
+          roomToTableMap.set(roomNumber, {
+            tableNumber: item.tableNumber,
+            note: item.text,
+          });
+        }
       }
 
       return roomToTableMap;
