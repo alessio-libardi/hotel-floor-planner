@@ -75,7 +75,7 @@
         >
           @for (roomNumber of draftRoomNumbers; track roomNumber) {
             <mat-tab [label]="roomTabLabel(roomNumber)">
-              <div class="shape-detail-dialog-tab-content">
+              <div class="shape-detail-dialog-tab-content" aria-live="polite">
                 @if (draftRoomNumbers.length === 1) {
                   <mat-form-field appearance="outline">
                     <mat-label>Arrival and leaving date</mat-label>
@@ -111,7 +111,7 @@
                     <dt>Leaving</dt>
                     <dd>{{ roomDepartureDateText(roomNumber) }}</dd>
                   </dl>
-                  <p class="shape-detail-dialog-muted" aria-live="polite">
+                  <p class="shape-detail-dialog-muted">
                     Dates can only be edited when a single room is linked.
                   </p>
                 }
