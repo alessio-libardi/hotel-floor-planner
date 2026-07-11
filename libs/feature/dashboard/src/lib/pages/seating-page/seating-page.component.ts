@@ -5,7 +5,6 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { DragDropModule, CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import {
   combineLatest,
   defer,
@@ -39,14 +38,12 @@ interface SeatingViewModel {
 }
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
-const SWIPE_ACTION_THRESHOLD = 64;
-const SWIPE_CLICK_SUPPRESSION_MS = 500;
+const SINGLE_CLICK_DELAY_MS = 250;
 
 @Component({
   selector: 'lib-seating-page',
   imports: [
     CommonModule,
-    DragDropModule,
     MatButtonModule,
     MatCardModule,
     MatDialogModule,
@@ -60,7 +57,10 @@ export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
   private readonly dialog = inject(MatDialog);
-  private readonly swipeClickSuppression = new Map<string, number>();
+  private readonly singleClickTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
 
   protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
     from(this.floorStore.ensureLoaded()).pipe(
@@ -125,47 +125,34 @@ export class SeatingPageComponent {
     });
   }
 
-  protected handleRoomDragEnded(
+  protected handleRoomDoubleClick(
     roomId: string,
     checkedDate: string | null,
-    today: string,
-    drag: CdkDrag,
-    event: CdkDragEnd
+    today: string
   ): void {
-    const deltaX = event.distance.x;
-
-    if (deltaX <= -SWIPE_ACTION_THRESHOLD) {
-      this.swipeClickSuppression.set(roomId, Date.now());
-      void this.floorStore.markRoomCheckedToday(roomId);
-    } else if (deltaX >= SWIPE_ACTION_THRESHOLD && checkedDate === today) {
-      this.swipeClickSuppression.set(roomId, Date.now());
-      void this.floorStore.clearRoomCheckedToday(roomId);
+    const timer = this.singleClickTimers.get(roomId);
+    if (timer != null) {
+      clearTimeout(timer);
+      this.singleClickTimers.delete(roomId);
     }
 
-    drag.reset();
+    if (checkedDate === today) {
+      void this.floorStore.clearRoomCheckedToday(roomId);
+    } else {
+      void this.floorStore.markRoomCheckedToday(roomId);
+    }
   }
 
   protected handleRoomClick(
     roomId: string,
     roomNumber: number,
-    note: string | null,
-    event: MouseEvent
+    note: string | null
   ): void {
-    const suppressedAt = this.swipeClickSuppression.get(roomId);
-
-    if (
-      suppressedAt != null &&
-      Date.now() - suppressedAt < SWIPE_CLICK_SUPPRESSION_MS
-    ) {
-      this.swipeClickSuppression.delete(roomId);
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-
-    this.swipeClickSuppression.delete(roomId);
-
-    this.openTableDetails(roomNumber, note);
+    const timer = setTimeout(() => {
+      this.singleClickTimers.delete(roomId);
+      this.openTableDetails(roomNumber, note);
+    }, SINGLE_CLICK_DELAY_MS);
+    this.singleClickTimers.set(roomId, timer);
   }
 
   protected tableNumberForRoom(

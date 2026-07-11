@@ -26,30 +26,19 @@
           @for (room of floor.rooms; track room.id) {
             <button
               mat-list-item
-              #roomDrag="cdkDrag"
               class="seating-room-row"
-              cdkDrag
-              cdkDragLockAxis="x"
-              cdkDragBoundary=".seating-room-list"
               type="button"
               [style.background-color]="roomRowBackground(room.departureDate)"
               [style.color]="roomRowForeground(room.departureDate)"
-              (cdkDragEnded)="
-                handleRoomDragEnded(
-                  room.id,
-                  room.checkedDate,
-                  vm.today,
-                  roomDrag,
-                  $event
-                )
-              "
               (click)="
                 handleRoomClick(
                   room.id,
                   room.number,
-                  noteForRoom(vm.roomToTableMap, room.number),
-                  $event
+                  noteForRoom(vm.roomToTableMap, room.number)
                 )
+              "
+              (dblclick)="
+                handleRoomDoubleClick(room.id, room.checkedDate, vm.today)
               "
             >
               <div matListItemTitle>Room {{ room.number }}</div>
