@@ -191,22 +191,23 @@ export class ShapeDetailDialogComponent {
   }
 
   protected stayRangeForRoom(roomNumber: number): RoomStayRange {
-    if (!this.roomStayRanges.has(roomNumber)) {
-      const room = this.roomOptionByNumber(roomNumber);
-      this.roomStayRanges.set(
-        roomNumber,
-        new FormGroup({
-          start: new FormControl<Date | null>(
-            this.toDateOnly(room?.arrivalDate ?? null)
-          ),
-          end: new FormControl<Date | null>(
-            this.toDateOnly(room?.departureDate ?? null)
-          ),
-        })
-      );
+    const existing = this.roomStayRanges.get(roomNumber);
+    if (existing) {
+      return existing;
     }
 
-    return this.roomStayRanges.get(roomNumber)!;
+    const room = this.roomOptionByNumber(roomNumber);
+    const fg = new FormGroup({
+      start: new FormControl<Date | null>(
+        this.toDateOnly(room?.arrivalDate ?? null)
+      ),
+      end: new FormControl<Date | null>(
+        this.toDateOnly(room?.departureDate ?? null)
+      ),
+    });
+    this.roomStayRanges.set(roomNumber, fg);
+
+    return fg;
   }
 
   protected hasInvalidDateRangeForRoom(roomNumber: number): boolean {
