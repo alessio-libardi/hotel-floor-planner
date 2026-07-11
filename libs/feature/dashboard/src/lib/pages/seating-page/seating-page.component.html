@@ -54,7 +54,9 @@
             >
               <div matListItemTitle>Room {{ room.number }}</div>
               @if (noteForRoom(vm.roomNoteMap, room.number); as roomNote) {
-                <span matListItemLine class="seating-room-note">{{ roomNote }}</span>
+                <span matListItemLine class="seating-room-note">{{
+                  roomNote
+                }}</span>
               }
               <span matListItemMeta class="seating-room-meta">
                 @if (isCheckedToday(room.checkedDate, vm.today)) {
