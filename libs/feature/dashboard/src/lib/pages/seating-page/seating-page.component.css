@@ -79,6 +79,14 @@
   font-weight: 500;
 }
 
+.seating-room-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  opacity: 0.72;
+}
+
 @page {
   margin: 12mm;
 }

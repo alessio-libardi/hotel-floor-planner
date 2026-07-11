@@ -29,12 +29,12 @@ import { SeatingTableDialogComponent } from './seating-table-dialog.component';
 
 interface RoomTableAssignment {
   tableNumber: string;
-  note: string;
 }
 
 interface SeatingViewModel {
   floors: FloorViewModel[];
   roomToTableMap: Map<number, RoomTableAssignment>;
+  roomNoteMap: Map<number, string | null>;
   today: string;
 }
 
@@ -89,7 +89,6 @@ export class SeatingPageComponent {
         for (const roomNumber of item.roomNumbers) {
           roomToTableMap.set(roomNumber, {
             tableNumber: item.tableNumber,
-            note: item.text,
           });
         }
       }
@@ -99,9 +98,23 @@ export class SeatingPageComponent {
     shareReplay(1)
   );
 
+  protected readonly roomNoteMap$ = this.floors$.pipe(
+    map((floors) => {
+      const roomNoteMap = new Map<number, string | null>();
+      for (const floor of floors) {
+        for (const room of floor.rooms) {
+          roomNoteMap.set(room.number, room.note);
+        }
+      }
+      return roomNoteMap;
+    }),
+    shareReplay(1)
+  );
+
   protected readonly vm$: Observable<SeatingViewModel> = combineLatest({
     floors: this.floors$,
     roomToTableMap: this.roomToTableMap$,
+    roomNoteMap: this.roomNoteMap$,
     today: this.today$,
   });
 
@@ -174,10 +187,10 @@ export class SeatingPageComponent {
   }
 
   protected noteForRoom(
-    roomToTableMap: Map<number, RoomTableAssignment>,
+    roomNoteMap: Map<number, string | null>,
     roomNumber: number
   ): string | null {
-    return roomToTableMap.get(roomNumber)?.note ?? null;
+    return roomNoteMap.get(roomNumber) ?? null;
   }
 
   protected isCheckedToday(checkedDate: string | null, today: string): boolean {

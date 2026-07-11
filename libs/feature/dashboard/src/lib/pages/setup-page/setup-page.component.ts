@@ -128,6 +128,7 @@ export class SetupPageComponent implements OnInit {
     await this.floorStore.updateRoomDetails(floorId, room.id, {
       arrivalDate: result.arrivalDate,
       departureDate: result.departureDate,
+      note: room.note,
     });
   }
 

@@ -44,9 +44,14 @@
   color: var(--mat-sys-error);
 }
 
-.shape-detail-dialog-links {
+.shape-detail-dialog-tab-content {
+  padding-top: 1rem;
   display: grid;
   gap: 0.5rem;
+}
+
+.shape-detail-dialog-tab-content .mat-mdc-form-field {
+  width: 100%;
 }
 
 .shape-detail-dialog-spacer {

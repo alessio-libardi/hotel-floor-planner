@@ -81,6 +81,7 @@ export class FloorStore {
       arrivalDate: null,
       departureDate: null,
       checkedDate: null,
+      note: null,
     };
 
     this.setFloors(
@@ -158,7 +159,7 @@ export class FloorStore {
   async updateRoomDetails(
     floorId: string,
     roomId: string,
-    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate'>
+    details: Pick<RoomViewModel, 'arrivalDate' | 'departureDate' | 'note'>
   ): Promise<void> {
     const previous = this.snapshot();
 

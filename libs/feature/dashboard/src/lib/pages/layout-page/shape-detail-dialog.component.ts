@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatNativeDateModule } from '@angular/material/core';
@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import { FloorStore } from '../../floor.store';
 import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 import {
@@ -29,13 +30,17 @@ export interface ShapeDetailRoomOption {
   roomNumber: number;
   arrivalDate: string | null;
   departureDate: string | null;
+  note: string | null;
 }
 export interface ShapeDetailDialogData {
   item: PlanItem;
   roomOptions: ShapeDetailRoomOption[];
 }
 
-const SINGLE_LINKED_ROOM_COUNT = 1;
+type RoomStayRange = FormGroup<{
+  start: FormControl<Date | null>;
+  end: FormControl<Date | null>;
+}>;
 
 @Component({
   selector: 'app-shape-detail-dialog',
@@ -50,6 +55,7 @@ const SINGLE_LINKED_ROOM_COUNT = 1;
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatTabsModule,
   ],
   templateUrl: './shape-detail-dialog.component.html',
   styleUrls: ['./shape-detail-dialog.component.css'],
@@ -62,11 +68,9 @@ export class ShapeDetailDialogComponent {
   protected attemptedSubmit = false;
   protected isSaving = false;
   protected saveErrorMessage = '';
-
-  protected readonly stayRange = new FormGroup({
-    start: new FormControl<Date | null>(null),
-    end: new FormControl<Date | null>(null),
-  });
+  protected readonly selectedTabIndex = signal(0);
+  protected readonly roomStayRanges = new Map<number, RoomStayRange>();
+  protected readonly draftRoomNotes = new Map<number, string>();
 
   private readonly store = inject(PlanLayoutStore);
   private readonly floorStore = inject(FloorStore);
@@ -86,7 +90,12 @@ export class ShapeDetailDialogComponent {
         ? `${this.selectedItem.tableNumber}`
         : '';
     this.draftRoomNumbers = [...this.selectedItem.roomNumbers];
-    this.setDateRangeFromSelectedRooms();
+
+    for (const roomNumber of this.draftRoomNumbers) {
+      this.getOrCreateStayRangeForRoom(roomNumber);
+      const room = this.roomOptionByNumber(roomNumber);
+      this.draftRoomNotes.set(roomNumber, room?.note ?? '');
+    }
   }
 
   protected primaryFieldLabel(): string {
@@ -109,8 +118,12 @@ export class ShapeDetailDialogComponent {
       : this.draftLabel;
   }
 
-  protected noteValue(): string {
-    return this.draftLabel;
+  protected noteValue(roomNumber: number): string {
+    return this.draftRoomNotes.get(roomNumber) ?? '';
+  }
+
+  protected onNoteInput(roomNumber: number, value: string): void {
+    this.draftRoomNotes.set(roomNumber, value);
   }
 
   protected onPrimaryFieldInput(value: string): void {
@@ -119,10 +132,6 @@ export class ShapeDetailDialogComponent {
       return;
     }
 
-    this.draftLabel = value;
-  }
-
-  protected onNoteInput(value: string): void {
     this.draftLabel = value;
   }
 
@@ -165,13 +174,55 @@ export class ShapeDetailDialogComponent {
   }
 
   protected onRoomSelectionChange(roomNumbers: number[] | null): void {
-    this.draftRoomNumbers = normalizeRoomNumbers(roomNumbers ?? []);
-    this.setDateRangeFromSelectedRooms();
+    const next = normalizeRoomNumbers(roomNumbers ?? []);
+
+    for (const roomNumber of next) {
+      this.getOrCreateStayRangeForRoom(roomNumber);
+      if (!this.draftRoomNotes.has(roomNumber)) {
+        const room = this.roomOptionByNumber(roomNumber);
+        this.draftRoomNotes.set(roomNumber, room?.note ?? '');
+      }
+    }
+
+    for (const existing of [...this.roomStayRanges.keys()]) {
+      if (!next.includes(existing)) {
+        this.roomStayRanges.delete(existing);
+        this.draftRoomNotes.delete(existing);
+      }
+    }
+
+    this.draftRoomNumbers = next;
+    this.selectedTabIndex.set(0);
   }
 
-  protected hasInvalidDateRange(): boolean {
-    const start = this.stayRange.controls.start.value;
-    const end = this.stayRange.controls.end.value;
+  protected getOrCreateStayRangeForRoom(roomNumber: number): RoomStayRange {
+    const existing = this.roomStayRanges.get(roomNumber);
+    if (existing) {
+      return existing;
+    }
+
+    const room = this.roomOptionByNumber(roomNumber);
+    const fg = new FormGroup({
+      start: new FormControl<Date | null>(
+        this.toDateOnly(room?.arrivalDate ?? null)
+      ),
+      end: new FormControl<Date | null>(
+        this.toDateOnly(room?.departureDate ?? null)
+      ),
+    });
+    this.roomStayRanges.set(roomNumber, fg);
+
+    return fg;
+  }
+
+  protected hasInvalidDateRangeForRoom(roomNumber: number): boolean {
+    const fg = this.roomStayRanges.get(roomNumber);
+    if (!fg) {
+      return false;
+    }
+
+    const start = fg.controls.start.value;
+    const end = fg.controls.end.value;
 
     if (!start || !end) {
       return false;
@@ -187,17 +238,21 @@ export class ShapeDetailDialogComponent {
     return endDate < startDate;
   }
 
-  protected canEditRoomDates(): boolean {
-    return (
-      this.selectedItem.type === 'table' &&
-      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
-    );
+  protected roomTabLabel(roomNumber: number): string {
+    const room = this.roomOptionByNumber(roomNumber);
+    return room
+      ? `Floor ${room.floorNumber} - Room ${room.roomNumber}`
+      : `Room ${roomNumber}`;
   }
 
-  protected hasMultipleLinkedRooms(): boolean {
-    return (
-      this.selectedItem.type === 'table' && this.draftRoomNumbers.length > 1
-    );
+  protected hasInvalidDateRange(): boolean {
+    for (const roomNumber of this.draftRoomNumbers) {
+      if (this.hasInvalidDateRangeForRoom(roomNumber)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   protected saveButtonDisabled(): boolean {
@@ -245,14 +300,8 @@ export class ShapeDetailDialogComponent {
           });
         }
 
-        if (this.draftLabel !== this.selectedItem.text) {
-          await this.store.updateItem(this.selectedItem.id, {
-            text: this.draftLabel,
-          });
-        }
-
         await this.persistTableRoomAssignment();
-        await this.persistRoomDateRange();
+        await this.persistRoomDetails();
       }
 
       this.dialogRef.close({ saved: true });
@@ -338,7 +387,6 @@ export class ShapeDetailDialogComponent {
         linkedTableIds: [],
         roomNumber: null,
         roomNumbers: [],
-        text: '',
         tableNumber: resetTableNumber,
       });
 
@@ -385,37 +433,33 @@ export class ShapeDetailDialogComponent {
     });
   }
 
-  private async persistRoomDateRange(): Promise<void> {
-    if (this.draftRoomNumbers.length !== 1) {
-      return;
-    }
+  private async persistRoomDetails(): Promise<void> {
+    await Promise.all(
+      [...this.roomStayRanges.keys()].map(async (roomNumber) => {
+        const room = this.roomOptionByNumber(roomNumber);
+        if (!room) {
+          return;
+        }
 
-    const selectedRoom = this.roomOptionByNumber(this.draftRoomNumbers[0]);
-    if (!selectedRoom) {
-      return;
-    }
+        const fg = this.roomStayRanges.get(roomNumber)!;
+        const arrivalDate = this.formatDateOnly(fg.controls.start.value);
+        const departureDate = this.formatDateOnly(fg.controls.end.value);
+        const note = (this.draftRoomNotes.get(roomNumber) ?? '').trim() || null;
 
-    const arrivalDate = this.formatDateOnly(
-      this.stayRange.controls.start.value
-    );
-    const departureDate = this.formatDateOnly(
-      this.stayRange.controls.end.value
-    );
+        if (
+          arrivalDate === room.arrivalDate &&
+          departureDate === room.departureDate &&
+          note === (room.note?.trim() || null)
+        ) {
+          return;
+        }
 
-    if (
-      arrivalDate === selectedRoom.arrivalDate &&
-      departureDate === selectedRoom.departureDate
-    ) {
-      return;
-    }
-
-    await this.floorStore.updateRoomDetails(
-      selectedRoom.floorId,
-      selectedRoom.roomId,
-      {
-        arrivalDate,
-        departureDate,
-      }
+        await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
+          arrivalDate,
+          departureDate,
+          note,
+        });
+      })
     );
   }
 
@@ -431,13 +475,18 @@ export class ShapeDetailDialogComponent {
           return;
         }
 
-        if (room.arrivalDate == null && room.departureDate == null) {
+        if (
+          room.arrivalDate === null &&
+          room.departureDate === null &&
+          room.note === null
+        ) {
           return;
         }
 
         await this.floorStore.updateRoomDetails(room.floorId, room.roomId, {
           arrivalDate: null,
           departureDate: null,
+          note: null,
         });
       })
     );
@@ -487,20 +536,6 @@ export class ShapeDetailDialogComponent {
       (room) =>
         selectedRoomNumbers.has(room.roomNumber) ||
         !assignedRoomNumbers.has(room.roomNumber)
-    );
-  }
-
-  private setDateRangeFromSelectedRooms(): void {
-    const room =
-      this.draftRoomNumbers.length === SINGLE_LINKED_ROOM_COUNT
-        ? this.roomOptionByNumber(this.draftRoomNumbers[0])
-        : undefined;
-
-    this.stayRange.controls.start.setValue(
-      this.toDateOnly(room?.arrivalDate ?? null)
-    );
-    this.stayRange.controls.end.setValue(
-      this.toDateOnly(room?.departureDate ?? null)
     );
   }
 
