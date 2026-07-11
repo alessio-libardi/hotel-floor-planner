@@ -232,7 +232,7 @@ export class ShapeDetailDialogComponent {
   protected roomTabLabel(roomNumber: number): string {
     const room = this.roomOptionByNumber(roomNumber);
     return room
-      ? `Floor ${room.floorNumber} – Room ${room.roomNumber}`
+      ? `Floor ${room.floorNumber} - Room ${room.roomNumber}`
       : `Room ${roomNumber}`;
   }
 
