@@ -32,8 +32,6 @@
               cdkDragLockAxis="x"
               cdkDragBoundary=".seating-room-list"
               type="button"
-              [style.background-color]="roomRowBackground(room.departureDate)"
-              [style.color]="roomRowForeground(room.departureDate)"
               (cdkDragEnded)="
                 handleRoomDragEnded(
                   room.id,
@@ -73,7 +71,11 @@
                   tableNumberForRoom(vm.roomToTableMap, room.number);
                   as tableNumber
                 ) {
-                  <span class="seating-room-table-chip">
+                  <span
+                    class="seating-room-table-chip"
+                    [style.background-color]="roomRowBackground(room.departureDate)"
+                    [style.color]="roomRowForeground(room.departureDate)"
+                  >
                     <mat-icon aria-hidden="true">table_restaurant</mat-icon>
                     <span>{{ tableNumber }}</span>
                   </span>
