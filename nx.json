@@ -1,7 +1,5 @@
 {
-  "installation": {
-    "version": "23.0.1"
-  },
+  "installation": { "version": "23.0.1" },
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "neverConnectToCloud": true,
   "analytics": false,
@@ -26,10 +24,7 @@
       "cache": true,
       "inputs": ["default", "^default"]
     },
-    "@nx/vitest:test": {
-      "cache": true,
-      "inputs": ["default", "^default"]
-    }
+    "@nx/vitest:test": { "cache": true, "inputs": ["default", "^default"] }
   },
   "generators": {
     "@nx/angular:application": {
@@ -42,9 +37,7 @@
       "linter": "eslint",
       "unitTestRunner": "vitest-analog"
     },
-    "@nx/angular:component": {
-      "style": "css"
-    }
+    "@nx/angular:component": { "style": "css" }
   },
   "plugins": [
     {
@@ -60,15 +53,9 @@
     },
     {
       "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "eslint:lint"
-      }
+      "options": { "targetName": "eslint:lint" }
     },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      }
-    }
-  ]
+    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" } }
+  ],
+  "nxCloudId": "6a535b2f7369a17d90566a23"
 }
