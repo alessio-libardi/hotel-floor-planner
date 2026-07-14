@@ -3,7 +3,6 @@
     "version": "23.0.1"
   },
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "neverConnectToCloud": true,
   "analytics": false,
   "targetDefaults": {
     "@angular/build:application": {
@@ -70,5 +69,10 @@
         "targetName": "test"
       }
     }
-  ]
+  ],
+  "nxCloudId": "6a535b2f7369a17d90566a23",
+  "namedInputs": {
+    "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"],
+    "default": ["sharedGlobals"]
+  }
 }

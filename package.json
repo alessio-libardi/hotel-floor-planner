@@ -3,19 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "nx": "nx",
     "start": "nx serve app",
     "build": "nx build app",
     "test": "nx test app || echo \"No tests found for app; skipping.\"",
     "lint": "nx lint app",
     "format": "nx format:write",
-    "format:check": "nx format:check",
-    "firebase:login": "firebase login",
-    "firebase:init": "firebase use hotel-floor-planner",
-    "firebase:deploy": "firebase deploy",
-    "firebase:deploy:hosting": "firebase deploy --only hosting",
-    "firebase:preview": "firebase hosting:channel:deploy",
-    "firebase:delete": "firebase hosting:channel:delete"
+    "format:check": "nx format:check"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "~2.1.2",

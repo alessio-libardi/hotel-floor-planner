@@ -1,6 +1,7 @@
 name: CD
 
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -9,16 +10,50 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
-  deploy:
-    name: Deploy
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="build"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+      - uses: nrwl/nx-set-shas@v5
+
+      - run: npx nx affected -t format lint test build
+
+      - run: npx nx fix-ci
+        if: always()
+
+  deploy_preview:
+    name: Deploy Preview
+    if: github.event_name == 'pull_request'
+    needs: verify
     runs-on: ubuntu-latest
     environment:
-      name: Live
+      name: Preview
       url: ${{ vars.WEBSITE_URL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Start Nx Cloud CI run
+        run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="deploy"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,8 +71,47 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app
-        run: npm run build
+      - name: Set SHAs for affected
+        uses: nrwl/nx-set-shas@v5
 
-      - name: Deploy
-        run: npm run firebase:deploy -- --only hosting,firestore:rules,firestore:indexes
+      - name: Deploy preview
+        run: npx nx affected -t deploy --projects=app,api --configuration=preview
+
+  deploy_live:
+    name: Deploy Live
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: Live
+      url: ${{ vars.WEBSITE_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Start Nx Cloud CI run
+        run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="deploy"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          create_credentials_file: true
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}'
+          credentials_file_path: '${{ github.workspace }}/google-application-credentials.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set SHAs for affected
+        uses: nrwl/nx-set-shas@v5
+
+      - name: Deploy live
+        run: npx nx affected -t deploy --projects=app,api --configuration=live
