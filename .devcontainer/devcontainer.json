@@ -36,7 +36,7 @@
   },
   "forwardPorts": [4000, 4200, 9099, 8080, 9199],
   "postCreateCommand": "npm install",
-  "postStartCommand": "docker compose up -d",
-  "postAttachCommand": "docker compose up -d",
+  "postStartCommand": "npm run api:start",
+  "postAttachCommand": "npm run api:start",
   "remoteUser": "node"
 }

@@ -1,0 +1,54 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "api",
+  "root": "apps/api",
+  "sourceRoot": "apps/api/src",
+  "tags": [],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose up -d",
+        "cwd": "apps/api"
+      },
+      "metadata": {
+        "description": "Start local firebase emulator services"
+      }
+    },
+    "stop": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker compose down",
+        "cwd": "apps/api"
+      },
+      "metadata": {
+        "description": "Stop local firebase emulator services"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "firebase deploy --only firestore:rules,firestore:indexes"
+      },
+      "inputs": [
+        "default",
+        "{workspaceRoot}/firebase.json",
+        "{projectRoot}/firestore.rules",
+        "{projectRoot}/firestore.indexes.json"
+      ],
+      "configurations": {
+        "preview": {
+          "command": "firebase deploy --project hotel-floor-planner---preview --only firestore:rules,firestore:indexes"
+        },
+        "live": {
+          "command": "firebase deploy --only firestore:rules,firestore:indexes"
+        }
+      },
+      "metadata": {
+        "description": "Deploy api to firebase"
+      }
+    }
+  }
+}
