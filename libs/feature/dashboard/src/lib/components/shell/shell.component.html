@@ -1,7 +1,9 @@
-<mat-drawer-container class="shell-drawer-container">
+<mat-drawer-container
+  class="shell-drawer-container print:h-auto! print:overflow-visible! print:bg-white!"
+>
   @if (isSmallViewport()) {
     <mat-drawer
-      class="shell-drawer"
+      class="shell-drawer print:hidden"
       mode="over"
       position="start"
       [opened]="isNavigationDrawerOpen()"
@@ -23,7 +25,9 @@
     </mat-drawer>
   }
 
-  <mat-drawer-content class="shell-content">
+  <mat-drawer-content
+    class="shell-content print:ml-0! print:h-auto! print:transform-none! print:overflow-visible!"
+  >
     <header
       class="border-b border-(--mat-sys-outline-variant) bg-(--mat-sys-surface) print:hidden"
     >
@@ -89,7 +93,7 @@
     </header>
 
     <main
-      class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4 print:overflow-visible! print:bg-white! print:p-0!"
+      class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4 print:h-auto! print:flex-none! print:overflow-visible! print:bg-white! print:p-0!"
     >
       <router-outlet></router-outlet>
     </main>
