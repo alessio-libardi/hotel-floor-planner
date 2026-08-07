@@ -33,7 +33,9 @@ jobs:
       - run: npm ci
       - uses: nrwl/nx-set-shas@v5
 
-      - run: npx nx affected -t format lint test build
+      - run: npx nx format:check --base="$NX_BASE" --head="$NX_HEAD"
+
+      - run: npx nx affected -t lint test build
 
       - run: npx nx fix-ci
         if: always()

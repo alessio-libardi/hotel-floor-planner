@@ -5,7 +5,7 @@
   "scripts": {
     "start": "nx serve app",
     "build": "nx build app",
-    "test": "nx test app || echo \"No tests found for app; skipping.\"",
+    "test": "nx run-many -t test --all",
     "lint": "nx lint app",
     "format": "nx format:write",
     "format:check": "nx format:check"
