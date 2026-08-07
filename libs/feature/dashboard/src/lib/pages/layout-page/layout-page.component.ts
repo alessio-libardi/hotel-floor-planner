@@ -10,6 +10,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import Konva from 'konva';
 import { inject } from '@angular/core';
@@ -33,6 +34,13 @@ import {
   ShapeDetailDialogData,
   ShapeDetailRoomOption,
 } from './shape-detail-dialog.component';
+import {
+  distanceBetween,
+  GesturePoint,
+  LayoutGestureMachine,
+  midpoint,
+  tableLinkChange,
+} from './layout-gesture';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -42,6 +50,7 @@ const SCALE_STEP = 1.15;
 const FOCUS_PADDING = 64;
 const MIN_CONTAINER_SIZE = GRID_SIZE;
 const MAX_TABLE_LINKS = 2;
+const LINK_HOLD_DELAY = 450;
 
 @Component({
   selector: 'app-layout-page',
@@ -50,6 +59,7 @@ const MAX_TABLE_LINKS = 2;
     MatButtonModule,
     MatDialogModule,
     MatIconModule,
+    MatSnackBarModule,
     MatToolbarModule,
   ],
   templateUrl: './layout-page.component.html',
@@ -62,13 +72,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   protected readonly selectedItem = signal<PlanItem | null>(null);
   protected roomOptions: ShapeDetailRoomOption[] = [];
   private roomOptionsByNumber = new Map<number, ShapeDetailRoomOption>();
-  protected readonly isPanMode = signal(true);
-  protected readonly isLinkMode = signal(false);
-  protected readonly linkModeStatus = signal<string>('');
-
-  private readonly linkSourceTableId = signal<string | null>(null);
 
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly store = inject(PlanLayoutStore);
+  private readonly floorStore = inject(FloorStore);
+  private readonly gestures = new LayoutGestureMachine();
 
   private viewScale = 1;
   private viewX = 0;
@@ -77,16 +86,33 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private stage: Konva.Stage | null = null;
   private gridLayer: Konva.Layer | null = null;
   private itemLayer: Konva.Layer | null = null;
+  private gestureLayer: Konva.Layer | null = null;
   private transformer: Konva.Transformer | null = null;
   private resizeSub: Subscription | null = null;
   private storeSub: Subscription | null = null;
   private floorsSub: Subscription | null = null;
   private hasAutoFocusedInitialItems = false;
-
-  constructor(
-    private readonly store: PlanLayoutStore,
-    private readonly floorStore: FloorStore
-  ) {}
+  private pointerListeners: AbortController | null = null;
+  private linkHoldTimer: ReturnType<typeof setTimeout> | null = null;
+  private interactionStartView: {
+    x: number;
+    y: number;
+    scale: number;
+  } | null = null;
+  private itemGestureStart: {
+    itemId: string;
+    x: number;
+    y: number;
+  } | null = null;
+  private pinchLastCenter: GesturePoint | null = null;
+  private pinchLastDistance = 0;
+  private linkSourceId: string | null = null;
+  private linkTargetId: string | null = null;
+  private linkSourceOutline: Konva.Rect | null = null;
+  private linkTargetOutline: Konva.Rect | null = null;
+  private linkPreviewLine: Konva.Line | null = null;
+  private linkPreviewLabel: Konva.Label | null = null;
+  private linkPulseAnimation: Konva.Animation | null = null;
 
   ngAfterViewInit(): void {
     this.initStage();
@@ -118,6 +144,9 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cancelLinkHold();
+    this.linkPulseAnimation?.stop();
+    this.pointerListeners?.abort();
     this.floorsSub?.unsubscribe();
     this.resizeSub?.unsubscribe();
     this.storeSub?.unsubscribe();
@@ -126,13 +155,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   protected async addTable(): Promise<void> {
     const item = await this.store.addItem('table');
-    this.setPanMode(false);
     this.selectById(item.id);
   }
 
   protected async addColumn(): Promise<void> {
     const item = await this.store.addItem('column');
-    this.setPanMode(false);
     this.selectById(item.id);
   }
 
@@ -167,22 +194,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     await firstValueFrom(dialogRef.afterClosed());
 
     this.selectById(selected.id);
-  }
-
-  protected currentModeLabel(): string {
-    if (this.isLinkMode()) {
-      return 'Link mode';
-    }
-
-    return this.isPanMode() ? 'Pan mode' : 'Edit mode';
-  }
-
-  protected zoomIn(): void {
-    this.zoomBy(SCALE_STEP);
-  }
-
-  protected zoomOut(): void {
-    this.zoomBy(1 / SCALE_STEP);
   }
 
   protected resetView(): void {
@@ -223,41 +234,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.applyViewportTransform();
   }
 
-  protected setPanMode(enabled: boolean): void {
-    if (this.isPanMode() === enabled && (!enabled || !this.isLinkMode())) {
-      return;
-    }
-
-    if (enabled) {
-      this.isLinkMode.set(false);
-      this.linkSourceTableId.set(null);
-      this.linkModeStatus.set('');
-    }
-
-    this.isPanMode.set(enabled);
-    this.updateCanvasInteractionMode();
-    this.renderItems();
-  }
-
-  protected setLinkMode(enabled: boolean): void {
-    if (this.isLinkMode() === enabled) {
-      return;
-    }
-
-    this.isLinkMode.set(enabled);
-
-    if (enabled) {
-      this.isPanMode.set(false);
-      this.linkModeStatus.set('Select the first table to start linking.');
-    } else {
-      this.linkSourceTableId.set(null);
-      this.linkModeStatus.set('');
-    }
-
-    this.updateCanvasInteractionMode();
-    this.renderItems();
-  }
-
   private initStage(): void {
     const host = this.stageHost.nativeElement;
     this.stage = new Konva.Stage({
@@ -268,6 +244,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     this.gridLayer = new Konva.Layer({ listening: false });
     this.itemLayer = new Konva.Layer();
+    this.gestureLayer = new Konva.Layer({ listening: false });
     this.transformer = new Konva.Transformer({
       rotateEnabled: false,
       enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
@@ -275,7 +252,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       centeredScaling: false,
       borderStroke: '#2563eb',
       borderStrokeWidth: 1,
-      anchorSize: 10,
+      anchorSize: 18,
       anchorStroke: '#2563eb',
       anchorFill: '#dbeafe',
       anchorCornerRadius: 2,
@@ -286,6 +263,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     this.stage.add(this.gridLayer);
     this.stage.add(this.itemLayer);
+    this.stage.add(this.gestureLayer);
     this.itemLayer.add(this.transformer);
 
     this.stage.on('wheel', (event) => {
@@ -300,29 +278,610 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       this.zoomBy(factor, pointer);
     });
 
-    this.stage.on('dragmove', () => {
-      if (!this.stage) {
+    this.bindPointerGestures();
+  }
+
+  private bindPointerGestures(): void {
+    if (!this.stage) {
+      return;
+    }
+
+    const content = this.stage.getContent();
+    this.pointerListeners?.abort();
+    this.pointerListeners = new AbortController();
+    const options = {
+      passive: false,
+      signal: this.pointerListeners.signal,
+    } as AddEventListenerOptions;
+
+    content.style.cursor = 'grab';
+    content.addEventListener(
+      'pointerdown',
+      (event) => this.onPointerDown(event),
+      options
+    );
+    content.addEventListener(
+      'pointermove',
+      (event) => this.onPointerMove(event),
+      options
+    );
+    content.addEventListener(
+      'pointerup',
+      (event) => this.onPointerUp(event),
+      options
+    );
+    content.addEventListener(
+      'pointercancel',
+      (event) => this.onPointerCancel(event),
+      options
+    );
+    content.addEventListener(
+      'lostpointercapture',
+      (event) => this.onPointerCancel(event),
+      options
+    );
+  }
+
+  private onPointerDown(event: PointerEvent): void {
+    if (!this.stage || (event.pointerType === 'mouse' && event.button !== 0)) {
+      return;
+    }
+
+    const point = this.pointerPoint(event);
+    const hit = this.stage.getIntersection(point);
+    if (this.isTransformerTarget(hit)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (this.gestures.pointerCount === 0) {
+      this.interactionStartView = {
+        x: this.viewX,
+        y: this.viewY,
+        scale: this.viewScale,
+      };
+    }
+
+    const item = this.itemFromNode(hit);
+    const previousState = this.gestures.state;
+    const state = this.gestures.begin(
+      event.pointerId,
+      point,
+      item
+        ? {
+            kind: 'item',
+            itemId: item.id,
+            canLink: item.type === 'table',
+          }
+        : { kind: 'canvas' }
+    );
+
+    try {
+      this.stage.getContent().setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is an enhancement; window-bound pointer events still work.
+    }
+
+    if (state === 'pinch') {
+      this.cancelLinkHold();
+      if (previousState === 'item-move') {
+        this.restoreItemGesturePosition();
+      }
+      this.clearLinkFeedback();
+      this.startPinch();
+      return;
+    }
+
+    if (item) {
+      this.itemGestureStart = {
+        itemId: item.id,
+        x: item.x,
+        y: item.y,
+      };
+
+      if (item.type === 'table') {
+        this.startLinkHold(event.pointerId, item.id);
+      }
+    }
+  }
+
+  private onPointerMove(event: PointerEvent): void {
+    if (!this.stage) {
+      return;
+    }
+
+    const point = this.pointerPoint(event);
+
+    if (this.gestures.pointerCount === 0) {
+      const item = this.itemAtPoint(point);
+      this.stage.getContent().style.cursor = item ? 'pointer' : 'grab';
+      return;
+    }
+
+    event.preventDefault();
+    const previousState = this.gestures.state;
+    const state = this.gestures.move(event.pointerId, point);
+
+    if (state === 'pinch') {
+      this.updatePinch();
+      return;
+    }
+
+    if (state === 'item-move') {
+      if (previousState !== 'item-move') {
+        this.cancelLinkHold();
+      }
+      this.moveGestureItem(point);
+      this.stage.getContent().style.cursor = 'grabbing';
+      return;
+    }
+
+    if (state === 'pan') {
+      this.cancelLinkHold();
+      this.panTo(point);
+      this.stage.getContent().style.cursor = 'grabbing';
+      return;
+    }
+
+    if (state === 'link-drag') {
+      this.updateLinkFeedback(point);
+    }
+  }
+
+  private onPointerUp(event: PointerEvent): void {
+    if (!this.stage || this.gestures.pointerCount === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const point = this.pointerPoint(event);
+    const ended = this.gestures.end(event.pointerId, point);
+    if (!ended) {
+      return;
+    }
+
+    this.cancelLinkHold();
+
+    if (ended.state === 'pinch') {
+      if (this.gestures.pointerCount === 0) {
+        this.finishPointerInteraction();
+      }
+      return;
+    }
+
+    if (ended.state === 'link-drag') {
+      this.updateLinkFeedback(point);
+      const sourceId = this.linkSourceId;
+      const targetId = this.linkTargetId;
+      this.clearLinkFeedback();
+      this.finishPointerInteraction();
+
+      if (sourceId && targetId) {
+        void this.toggleLinkBetweenTables(sourceId, targetId).catch(() => {
+          this.showGestureStatus('Unable to update the table link.');
+        });
+      }
+      return;
+    }
+
+    if (ended.state === 'item-move') {
+      void this.commitGestureItemMove().catch(() => {
+        this.showGestureStatus('Unable to move this item.');
+        this.renderItems();
+      });
+      this.finishPointerInteraction();
+      return;
+    }
+
+    if (ended.state === 'pan') {
+      this.finishPointerInteraction();
+      return;
+    }
+
+    if (ended.target?.kind === 'item' && ended.target.itemId) {
+      this.selectById(ended.target.itemId);
+      void this.openSelectedEditor();
+    } else {
+      this.selectedItem.set(null);
+      this.renderItems();
+    }
+
+    this.finishPointerInteraction();
+  }
+
+  private onPointerCancel(event: PointerEvent): void {
+    if (!this.gestures.hasPointer(event.pointerId)) {
+      return;
+    }
+
+    event.preventDefault();
+    this.cancelLinkHold();
+    this.restoreItemGesturePosition();
+    this.clearLinkFeedback();
+
+    if (this.interactionStartView) {
+      this.viewX = this.interactionStartView.x;
+      this.viewY = this.interactionStartView.y;
+      this.viewScale = this.interactionStartView.scale;
+      this.applyViewportTransform();
+    }
+
+    this.gestures.cancelAll();
+    this.finishPointerInteraction();
+  }
+
+  private startLinkHold(pointerId: number, itemId: string): void {
+    this.cancelLinkHold();
+    this.linkHoldTimer = setTimeout(() => {
+      this.linkHoldTimer = null;
+      if (!this.gestures.activateLink(pointerId)) {
         return;
       }
 
-      this.viewX = this.stage.x();
-      this.viewY = this.stage.y();
-    });
-
-    this.stage.on('click', (event) => {
-      if (event.target === this.stage) {
-        this.selectedItem.set(null);
-
-        if (this.isLinkMode()) {
-          this.linkSourceTableId.set(null);
-          this.linkModeStatus.set('Select a table to start linking.');
-        }
-
-        this.renderItems();
+      const point = this.gestures.primaryPoint();
+      if (!point) {
+        return;
       }
-    });
 
-    this.updateCanvasInteractionMode();
+      this.beginLinkFeedback(itemId, point);
+    }, LINK_HOLD_DELAY);
+  }
+
+  private cancelLinkHold(): void {
+    if (this.linkHoldTimer != null) {
+      clearTimeout(this.linkHoldTimer);
+      this.linkHoldTimer = null;
+    }
+  }
+
+  private startPinch(): void {
+    const points = this.gestures.points();
+    if (points.length < 2) {
+      return;
+    }
+
+    this.pinchLastCenter = midpoint(points[0], points[1]);
+    this.pinchLastDistance = distanceBetween(points[0], points[1]);
+    if (this.stage) {
+      this.stage.getContent().style.cursor = 'grabbing';
+    }
+  }
+
+  private updatePinch(): void {
+    const points = this.gestures.points();
+    if (
+      points.length < 2 ||
+      !this.pinchLastCenter ||
+      this.pinchLastDistance <= 0
+    ) {
+      return;
+    }
+
+    const nextCenter = midpoint(points[0], points[1]);
+    const nextDistance = distanceBetween(points[0], points[1]);
+    const worldX = (this.pinchLastCenter.x - this.viewX) / this.viewScale;
+    const worldY = (this.pinchLastCenter.y - this.viewY) / this.viewScale;
+    const nextScale = this.clamp(
+      this.viewScale * (nextDistance / this.pinchLastDistance),
+      MIN_SCALE,
+      MAX_SCALE
+    );
+
+    this.viewScale = nextScale;
+    this.viewX = nextCenter.x - worldX * nextScale;
+    this.viewY = nextCenter.y - worldY * nextScale;
+    this.pinchLastCenter = nextCenter;
+    this.pinchLastDistance = nextDistance;
+    this.applyViewportTransform();
+  }
+
+  private panTo(point: GesturePoint): void {
+    const start = this.gestures.primaryStart();
+    const view = this.interactionStartView;
+    if (!start || !view) {
+      return;
+    }
+
+    this.viewX = view.x + point.x - start.x;
+    this.viewY = view.y + point.y - start.y;
+    this.applyViewportTransform();
+  }
+
+  private moveGestureItem(point: GesturePoint): void {
+    const start = this.gestures.primaryStart();
+    const itemStart = this.itemGestureStart;
+    if (!start || !itemStart) {
+      return;
+    }
+
+    const node = this.findItemNode(itemStart.itemId);
+    if (!node) {
+      return;
+    }
+
+    node.position({
+      x: this.snap(itemStart.x + (point.x - start.x) / this.viewScale),
+      y: this.snap(itemStart.y + (point.y - start.y) / this.viewScale),
+    });
+    this.itemLayer?.batchDraw();
+  }
+
+  private async commitGestureItemMove(): Promise<void> {
+    const itemStart = this.itemGestureStart;
+    if (!itemStart) {
+      return;
+    }
+
+    const node = this.findItemNode(itemStart.itemId);
+    if (!node) {
+      return;
+    }
+
+    const x = this.snap(node.x());
+    const y = this.snap(node.y());
+    node.position({ x, y });
+    await this.store.updateItem(itemStart.itemId, { x, y });
+    this.selectById(itemStart.itemId);
+  }
+
+  private restoreItemGesturePosition(): void {
+    if (!this.itemGestureStart) {
+      return;
+    }
+
+    const node = this.findItemNode(this.itemGestureStart.itemId);
+    node?.position({
+      x: this.itemGestureStart.x,
+      y: this.itemGestureStart.y,
+    });
+    this.itemLayer?.batchDraw();
+  }
+
+  private finishPointerInteraction(): void {
+    this.interactionStartView = null;
+    this.itemGestureStart = null;
+    this.pinchLastCenter = null;
+    this.pinchLastDistance = 0;
+    if (this.stage) {
+      this.stage.getContent().style.cursor = 'grab';
+    }
+  }
+
+  private pointerPoint(event: PointerEvent): GesturePoint {
+    if (!this.stage) {
+      return { x: 0, y: 0 };
+    }
+
+    const bounds = this.stage.getContent().getBoundingClientRect();
+    return {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    };
+  }
+
+  private beginLinkFeedback(sourceId: string, point: GesturePoint): void {
+    const source = this.store.items.find(
+      (item) => item.id === sourceId && item.type === 'table'
+    );
+    if (!source || !this.gestureLayer) {
+      this.gestures.cancelAll();
+      return;
+    }
+
+    this.clearLinkFeedback();
+    this.linkSourceId = sourceId;
+    this.linkSourceOutline = new Konva.Rect({
+      x: source.x - 6,
+      y: source.y - 6,
+      width: source.width + 12,
+      height: source.height + 12,
+      cornerRadius: 18,
+      stroke: '#f59e0b',
+      strokeWidth: 4,
+      dash: [8, 5],
+      listening: false,
+    });
+    this.linkPreviewLine = new Konva.Line({
+      points: [...this.tableCenter(source), ...this.screenToWorld(point)],
+      stroke: '#f59e0b',
+      strokeWidth: 4,
+      dash: [10, 7],
+      lineCap: 'round',
+      listening: false,
+    });
+    this.linkTargetOutline = new Konva.Rect({
+      visible: false,
+      strokeWidth: 4,
+      cornerRadius: 18,
+      listening: false,
+    });
+    this.linkPreviewLabel = new Konva.Label({ listening: false });
+    this.linkPreviewLabel.add(
+      new Konva.Tag({
+        fill: '#7c2d12',
+        cornerRadius: 6,
+        pointerDirection: 'left',
+        pointerWidth: 8,
+        pointerHeight: 8,
+      })
+    );
+    this.linkPreviewLabel.add(
+      new Konva.Text({
+        text: 'Drag to another table',
+        fontSize: 14,
+        fontStyle: 'bold',
+        padding: 7,
+        fill: '#ffffff',
+        listening: false,
+      })
+    );
+
+    this.gestureLayer.add(
+      this.linkPreviewLine,
+      this.linkSourceOutline,
+      this.linkTargetOutline,
+      this.linkPreviewLabel
+    );
+    this.linkPulseAnimation = new Konva.Animation((frame) => {
+      if (!this.linkSourceOutline || !frame) {
+        return;
+      }
+
+      this.linkSourceOutline.opacity(0.62 + Math.sin(frame.time / 115) * 0.28);
+    }, this.gestureLayer);
+    this.linkPulseAnimation.start();
+    this.stage?.getContent().style.setProperty('cursor', 'crosshair');
+    this.updateLinkFeedback(point);
+  }
+
+  private updateLinkFeedback(point: GesturePoint): void {
+    if (
+      !this.linkSourceId ||
+      !this.linkPreviewLine ||
+      !this.linkPreviewLabel ||
+      !this.linkTargetOutline
+    ) {
+      return;
+    }
+
+    const source = this.store.items.find(
+      (item) => item.id === this.linkSourceId && item.type === 'table'
+    );
+    if (!source) {
+      this.clearLinkFeedback();
+      return;
+    }
+
+    const [worldX, worldY] = this.screenToWorld(point);
+    const candidate = this.itemAtPoint(point);
+    const validTarget =
+      candidate?.type === 'table' && candidate.id !== source.id
+        ? candidate
+        : null;
+    const currentlyLinked = validTarget
+      ? source.linkedTableIds.includes(validTarget.id)
+      : false;
+    const linkChange = validTarget
+      ? tableLinkChange(source, validTarget, MAX_TABLE_LINKS)
+      : null;
+    const linkBlocked = linkChange != null && !linkChange.ok;
+    const color =
+      currentlyLinked || linkBlocked
+        ? '#dc2626'
+        : validTarget
+          ? '#16a34a'
+          : '#f59e0b';
+    const label = linkBlocked
+      ? 'Link limit reached'
+      : currentlyLinked
+        ? 'Unlink'
+        : validTarget
+          ? 'Link'
+          : candidate
+            ? candidate.id === source.id
+              ? 'Choose another table'
+              : 'Tables only'
+            : 'Drag to another table';
+
+    this.linkTargetId = validTarget?.id ?? null;
+    this.linkPreviewLine.points([...this.tableCenter(source), worldX, worldY]);
+    this.linkPreviewLine.stroke(color);
+    this.linkPreviewLabel.position({
+      x: worldX + 12 / this.viewScale,
+      y: worldY,
+    });
+    this.linkPreviewLabel.scale({
+      x: 1 / this.viewScale,
+      y: 1 / this.viewScale,
+    });
+    const labelText = this.linkPreviewLabel.findOne('Text');
+    const labelTag = this.linkPreviewLabel.findOne('Tag');
+    if (labelText instanceof Konva.Text) {
+      labelText.text(label);
+    }
+    if (labelTag instanceof Konva.Tag) {
+      labelTag.fill(color);
+    }
+
+    if (candidate && candidate.id !== source.id) {
+      this.linkTargetOutline.setAttrs({
+        x: candidate.x - 6,
+        y: candidate.y - 6,
+        width: candidate.width + 12,
+        height: candidate.height + 12,
+        stroke: validTarget ? color : '#dc2626',
+        dash: validTarget ? [] : [8, 5],
+        visible: true,
+      });
+    } else {
+      this.linkTargetOutline.visible(false);
+    }
+
+    this.gestureLayer?.batchDraw();
+  }
+
+  private clearLinkFeedback(): void {
+    this.linkPulseAnimation?.stop();
+    this.linkPulseAnimation = null;
+    this.gestureLayer?.destroyChildren();
+    this.gestureLayer?.draw();
+    this.linkSourceId = null;
+    this.linkTargetId = null;
+    this.linkSourceOutline = null;
+    this.linkTargetOutline = null;
+    this.linkPreviewLine = null;
+    this.linkPreviewLabel = null;
+  }
+
+  private screenToWorld(point: GesturePoint): [number, number] {
+    return [
+      (point.x - this.viewX) / this.viewScale,
+      (point.y - this.viewY) / this.viewScale,
+    ];
+  }
+
+  private itemAtPoint(point: GesturePoint): PlanItem | null {
+    return this.stage
+      ? this.itemFromNode(this.stage.getIntersection(point))
+      : null;
+  }
+
+  private itemFromNode(node: Konva.Node | null): PlanItem | null {
+    let current: Konva.Node | null = node;
+
+    while (current && current !== this.stage) {
+      const itemId = current.id();
+      const item = this.store.items.find((entry) => entry.id === itemId);
+      if (item) {
+        return item;
+      }
+      current = current.getParent();
+    }
+
+    return null;
+  }
+
+  private isTransformerTarget(node: Konva.Node | null): boolean {
+    let current: Konva.Node | null = node;
+    while (current) {
+      if (current === this.transformer) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private findItemNode(itemId: string): Konva.Node | null {
+    if (!this.itemLayer) {
+      return null;
+    }
+
+    return (
+      this.itemLayer.getChildren().find((child) => child.id() === itemId) ??
+      null
+    );
   }
 
   private resizeStage(): void {
@@ -395,11 +954,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         text: item.text,
         fontSize: 16,
         fill: '#1e293b',
-        draggable: !this.isPanMode(),
-        listening: !this.isPanMode(),
+        draggable: false,
+        listening: true,
       });
 
-      this.wireNodeInteractions(text, item.id);
       return text;
     }
 
@@ -407,8 +965,8 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       id: item.id,
       x: item.x,
       y: item.y,
-      draggable: !this.isPanMode(),
-      listening: !this.isPanMode(),
+      draggable: false,
+      listening: true,
     });
 
     const rect = new Konva.Rect({
@@ -490,7 +1048,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    this.wireNodeInteractions(group, item.id);
     return group;
   }
 
@@ -503,7 +1060,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     const tablesById = new Map(tables.map((table) => [table.id, table]));
     const renderedLinks = new Set<string>();
     const selectedId = this.selectedItem()?.id;
-    const linkSourceId = this.linkSourceTableId();
 
     for (const table of tables) {
       for (const linkedId of table.linkedTableIds) {
@@ -523,19 +1079,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         const [startX, startY] = this.tableCenter(table);
         const [endX, endY] = this.tableCenter(linkedTable);
         const highlighted =
-          selectedId === table.id ||
-          selectedId === linkedTable.id ||
-          linkSourceId === table.id ||
-          linkSourceId === linkedTable.id;
+          selectedId === table.id || selectedId === linkedTable.id;
 
         this.itemLayer.add(
           new Konva.Line({
             points: [startX, startY, endX, endY],
-            stroke: highlighted
-              ? this.isLinkMode()
-                ? '#f59e0b'
-                : '#2563eb'
-              : '#94a3b8',
+            stroke: highlighted ? '#2563eb' : '#94a3b8',
             strokeWidth: highlighted ? 4 : 2,
             dash: [8, 6],
             lineCap: 'round',
@@ -544,57 +1093,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         );
       }
     }
-  }
-
-  private wireNodeInteractions(node: Konva.Node, itemId: string): void {
-    let draggedInCurrentGesture = false;
-
-    if (!this.isPanMode() && !this.isLinkMode()) {
-      node.dragBoundFunc((position) => ({
-        x: this.snap(position.x),
-        y: this.snap(position.y),
-      }));
-    }
-
-    node.on('dragstart', () => {
-      if (this.isPanMode()) {
-        return;
-      }
-
-      draggedInCurrentGesture = true;
-    });
-
-    node.on('click tap', () => {
-      if (this.isPanMode()) {
-        return;
-      }
-
-      if (this.isLinkMode()) {
-        void this.handleLinkModeNodeClick(itemId);
-        return;
-      }
-
-      if (draggedInCurrentGesture) {
-        draggedInCurrentGesture = false;
-        return;
-      }
-
-      this.selectById(itemId);
-      void this.openSelectedEditor();
-    });
-
-    node.on('dragend', () => {
-      if (this.isPanMode() || this.isLinkMode()) {
-        return;
-      }
-
-      const x = this.snap(node.x());
-      const y = this.snap(node.y());
-      node.position({ x, y });
-      void this.store.updateItem(itemId, { x, y });
-      this.selectById(itemId);
-      draggedInCurrentGesture = false;
-    });
   }
 
   private extractRooms(floors: FloorViewModel[]): ShapeDetailRoomOption[] {
@@ -626,7 +1124,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private attachContainerResizeHandle(): void {
-    if (!this.itemLayer || !this.transformer || this.isPanMode()) {
+    if (!this.itemLayer || !this.transformer) {
       return;
     }
 
@@ -767,12 +1265,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       width: maxX - minX,
       height: maxY - minY,
     };
-  }
-
-  private uniqueLinkIds(linkedTableIds: string[]): string[] {
-    return [...new Set(linkedTableIds)].sort((left, right) =>
-      left.localeCompare(right)
-    );
   }
 
   private itemBorderColor(selected: boolean): string {
@@ -1000,36 +1492,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.stage.batchDraw();
   }
 
-  private async handleLinkModeNodeClick(itemId: string): Promise<void> {
-    const item = this.store.items.find((entry) => entry.id === itemId);
-
-    if (!item || item.type !== 'table') {
-      this.linkModeStatus.set('Only tables can be linked.');
-      return;
-    }
-
-    const sourceId = this.linkSourceTableId();
-
-    if (!sourceId) {
-      this.linkSourceTableId.set(item.id);
-      this.selectedItem.set(item);
-      this.linkModeStatus.set(
-        'Select another table to link or unlink with this source.'
-      );
-      this.renderItems();
-      return;
-    }
-
-    if (sourceId === item.id) {
-      this.linkSourceTableId.set(null);
-      this.linkModeStatus.set('Source cleared. Select a table to start again.');
-      this.renderItems();
-      return;
-    }
-
-    await this.toggleLinkBetweenTables(sourceId, item.id);
-  }
-
   private async toggleLinkBetweenTables(
     sourceTableId: string,
     targetTableId: string
@@ -1042,36 +1504,27 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     );
 
     if (!source || !target) {
-      this.linkModeStatus.set('Could not find one of the selected tables.');
+      this.showGestureStatus('Could not find one of the selected tables.');
       return;
     }
 
-    const currentlyLinked = source.linkedTableIds.includes(target.id);
-
-    if (!currentlyLinked) {
-      if (source.linkedTableIds.length >= MAX_TABLE_LINKS) {
-        this.linkModeStatus.set('Source table already has 2 linked tables.');
-        return;
-      }
-
-      if (target.linkedTableIds.length >= MAX_TABLE_LINKS) {
-        this.linkModeStatus.set('Target table already has 2 linked tables.');
-        return;
-      }
+    const change = tableLinkChange(source, target, MAX_TABLE_LINKS);
+    if (!change.ok) {
+      const message =
+        change.reason === 'source-full'
+          ? 'This table already has 2 linked tables.'
+          : change.reason === 'target-full'
+            ? 'The target already has 2 linked tables.'
+            : 'Choose another table.';
+      this.showGestureStatus(message);
+      return;
     }
 
-    const nextSourceLinks = currentlyLinked
-      ? source.linkedTableIds.filter((entry) => entry !== target.id)
-      : [...source.linkedTableIds, target.id];
-    const nextTargetLinks = currentlyLinked
-      ? target.linkedTableIds.filter((entry) => entry !== source.id)
-      : [...target.linkedTableIds, source.id];
-
     await this.store.updateItem(source.id, {
-      linkedTableIds: this.uniqueLinkIds(nextSourceLinks),
+      linkedTableIds: change.sourceLinks,
     });
     await this.store.updateItem(target.id, {
-      linkedTableIds: this.uniqueLinkIds(nextTargetLinks),
+      linkedTableIds: change.targetLinks,
     });
 
     await this.syncLinkedTableNumbers(source.id);
@@ -1083,34 +1536,19 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       this.selectedItem.set(refreshedSource);
     }
 
-    this.linkSourceTableId.set(source.id);
-    this.linkModeStatus.set(
-      currentlyLinked ? 'Tables unlinked.' : 'Tables linked.'
+    this.showGestureStatus(
+      change.action === 'unlink' ? 'Tables unlinked.' : 'Tables linked.'
     );
     this.renderItems();
   }
 
-  private updateCanvasInteractionMode(): void {
-    if (!this.stage) {
-      return;
-    }
-
-    const panEnabled = this.isPanMode();
-    const linkMode = this.isLinkMode();
-    this.stage.draggable(panEnabled);
-    this.stage.container().style.cursor = panEnabled
-      ? 'grab'
-      : linkMode
-        ? 'crosshair'
-        : 'default';
-
-    if (panEnabled) {
-      this.selectedItem.set(null);
-    }
-
-    if (!panEnabled || linkMode) {
-      this.stage.stopDrag();
-    }
+  private showGestureStatus(message: string): void {
+    this.snackBar.open(message, undefined, {
+      duration: 2400,
+      horizontalPosition: 'center',
+      verticalPosition: 'bottom',
+      politeness: 'polite',
+    });
   }
 
   private clamp(value: number, min: number, max: number): number {
