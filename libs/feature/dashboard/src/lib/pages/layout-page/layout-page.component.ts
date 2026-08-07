@@ -22,8 +22,6 @@ import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
 import {
   getRoomDepartureStatus,
   RoomDepartureStatus,
-  TOMORROW_HIGHLIGHT_BACKGROUND,
-  TOMORROW_HIGHLIGHT_FOREGROUND,
 } from '../../room-departure-status';
 import { formatTableRoomLabel } from '../../room-assignment';
 import { TableChainRuleFailure } from '../../table-link-chain';
@@ -41,6 +39,10 @@ import {
 } from './layout-gesture';
 import { LayoutLockService } from './layout-lock.service';
 import { LayoutUnlockDialogComponent } from './layout-unlock-dialog.component';
+import {
+  layoutCanvasPalette,
+  LayoutCanvasPalette,
+} from './layout-canvas-palette';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -117,6 +119,15 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private linkPreviewLine: Konva.Line | null = null;
   private linkPreviewLabel: Konva.Label | null = null;
   private linkPulseAnimation: Konva.Animation | null = null;
+  private colorSchemeQuery: MediaQueryList | null = null;
+  private darkMode = false;
+
+  private readonly handleColorSchemeChange = (
+    event: MediaQueryListEvent
+  ): void => {
+    this.darkMode = event.matches;
+    this.applyCanvasPalette();
+  };
 
   constructor() {
     effect(() => {
@@ -127,6 +138,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    this.colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    this.darkMode = this.colorSchemeQuery.matches;
+    this.colorSchemeQuery.addEventListener(
+      'change',
+      this.handleColorSchemeChange
+    );
     this.initStage();
     this.drawGrid();
     void this.floorStore.ensureLoaded();
@@ -163,6 +180,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.floorsSub?.unsubscribe();
     this.resizeSub?.unsubscribe();
     this.storeSub?.unsubscribe();
+    this.colorSchemeQuery?.removeEventListener(
+      'change',
+      this.handleColorSchemeChange
+    );
     this.stage?.destroy();
   }
 
@@ -308,6 +329,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   private initStage(): void {
     const host = this.stageHost.nativeElement;
+    const palette = this.canvasPalette;
     this.stage = new Konva.Stage({
       container: host,
       width: host.clientWidth,
@@ -322,11 +344,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
       keepRatio: true,
       centeredScaling: false,
-      borderStroke: '#2563eb',
+      borderStroke: palette.selection,
       borderStrokeWidth: 1,
       anchorSize: 18,
-      anchorStroke: '#2563eb',
-      anchorFill: '#dbeafe',
+      anchorStroke: palette.selection,
+      anchorFill: palette.selectionAnchor,
       anchorCornerRadius: 2,
     });
     this.transformer.on('transformend', () => {
@@ -761,6 +783,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
+    const palette = this.canvasPalette;
     this.clearLinkFeedback();
     this.linkSourceId = sourceId;
     this.linkSourceOutline = new Konva.Rect({
@@ -769,14 +792,14 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       width: source.width + 12,
       height: source.height + 12,
       cornerRadius: 18,
-      stroke: '#f59e0b',
+      stroke: palette.linkNeutral,
       strokeWidth: 4,
       dash: [8, 5],
       listening: false,
     });
     this.linkPreviewLine = new Konva.Line({
       points: [...this.tableCenter(source), ...this.screenToWorld(point)],
-      stroke: '#f59e0b',
+      stroke: palette.linkNeutral,
       strokeWidth: 4,
       dash: [10, 7],
       lineCap: 'round',
@@ -791,7 +814,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.linkPreviewLabel = new Konva.Label({ listening: false });
     this.linkPreviewLabel.add(
       new Konva.Tag({
-        fill: '#7c2d12',
+        fill: palette.linkNeutral,
         cornerRadius: 6,
         pointerDirection: 'left',
         pointerWidth: 8,
@@ -804,7 +827,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         fontSize: 14,
         fontStyle: 'bold',
         padding: 7,
-        fill: '#ffffff',
+        fill: palette.linkLabelText,
         listening: false,
       })
     );
@@ -856,12 +879,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       : null;
     const linkBlocked = linkChange != null && !linkChange.ok;
     const willUnlink = linkChange?.ok && linkChange.action === 'unlink';
+    const palette = this.canvasPalette;
     const color =
       willUnlink || linkBlocked
-        ? '#dc2626'
+        ? palette.linkDanger
         : validTarget
-          ? '#16a34a'
-          : '#f59e0b';
+          ? palette.linkSuccess
+          : palette.linkNeutral;
     const label = linkBlocked
       ? this.tableChainRuleLabel(linkChange.reason)
       : willUnlink
@@ -900,7 +924,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         y: candidate.y - 6,
         width: candidate.width + 12,
         height: candidate.height + 12,
-        stroke: validTarget ? color : '#dc2626',
+        stroke: validTarget ? color : palette.linkDanger,
         dash: validTarget ? [] : [8, 5],
         visible: true,
       });
@@ -984,18 +1008,34 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     this.applyViewportTransform();
   }
 
+  private get canvasPalette(): LayoutCanvasPalette {
+    return layoutCanvasPalette(this.darkMode);
+  }
+
+  private applyCanvasPalette(): void {
+    const palette = this.canvasPalette;
+    this.transformer?.setAttrs({
+      borderStroke: palette.selection,
+      anchorStroke: palette.selection,
+      anchorFill: palette.selectionAnchor,
+    });
+    this.drawGrid();
+    this.renderItems();
+  }
+
   private drawGrid(): void {
     if (!this.stage || !this.gridLayer) {
       return;
     }
 
     this.gridLayer.destroyChildren();
+    const palette = this.canvasPalette;
 
     for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += GRID_SIZE) {
       this.gridLayer.add(
         new Konva.Line({
           points: [x, -GRID_EXTENT, x, GRID_EXTENT],
-          stroke: '#e2e8f0',
+          stroke: palette.grid,
           strokeWidth: 1,
         })
       );
@@ -1005,7 +1045,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       this.gridLayer.add(
         new Konva.Line({
           points: [-GRID_EXTENT, y, GRID_EXTENT, y],
-          stroke: '#e2e8f0',
+          stroke: palette.grid,
           strokeWidth: 1,
         })
       );
@@ -1035,6 +1075,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   private createNode(item: PlanItem): Konva.Group | Konva.Shape {
     const selected = this.selectedItem()?.id === item.id;
+    const palette = this.canvasPalette;
 
     if (item.type === 'label') {
       const text = new Konva.Text({
@@ -1043,7 +1084,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         y: item.y,
         text: item.text,
         fontSize: 16,
-        fill: '#1e293b',
+        fill: palette.labelText,
         draggable: false,
         listening: true,
       });
@@ -1117,7 +1158,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
             x: item.width - 12,
             y: 12,
             radius: 7,
-            fill: '#f59e0b',
+            fill: palette.note,
             listening: false,
           })
         );
@@ -1131,7 +1172,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
             text: '!',
             fontSize: 11,
             fontStyle: 'bold',
-            fill: '#ffffff',
+            fill: palette.noteText,
             listening: false,
           })
         );
@@ -1150,6 +1191,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     const tablesById = new Map(tables.map((table) => [table.id, table]));
     const renderedLinks = new Set<string>();
     const selectedId = this.selectedItem()?.id;
+    const palette = this.canvasPalette;
 
     for (const table of tables) {
       for (const linkedId of table.linkedTableIds) {
@@ -1174,7 +1216,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         this.itemLayer.add(
           new Konva.Line({
             points: [startX, startY, endX, endY],
-            stroke: highlighted ? '#2563eb' : '#94a3b8',
+            stroke: highlighted ? palette.selection : palette.link,
             strokeWidth: highlighted ? 4 : 2,
             dash: [8, 6],
             lineCap: 'round',
@@ -1358,32 +1400,41 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private itemBorderColor(selected: boolean): string {
-    return selected ? '#2563eb' : '#94a3b8';
+    const palette = this.canvasPalette;
+    return selected ? palette.selection : palette.itemBorder;
   }
 
   private itemFillColor(item: PlanItem): string {
+    const palette = this.canvasPalette;
+
     if (item.type === 'table') {
       const status = this.assignedRoomStatus(item.roomNumbers);
 
       if (status === 'expired') {
-        return '#fee2e2';
+        return palette.expiredFill;
       }
 
       if (status === 'tomorrow') {
-        return TOMORROW_HIGHLIGHT_BACKGROUND;
+        return palette.tomorrowFill;
       }
     }
 
-    return item.type === 'table' ? '#dbeafe' : '#f1f5f9';
+    return item.type === 'table' ? palette.tableFill : palette.containerFill;
   }
 
   private itemTextColor(item: PlanItem): string {
+    const palette = this.canvasPalette;
+
     if (item.type !== 'table') {
-      return '#0f172a';
+      return palette.itemText;
     }
 
     const status = this.assignedRoomStatus(item.roomNumbers);
-    return status === 'tomorrow' ? TOMORROW_HIGHLIGHT_FOREGROUND : '#0f172a';
+    if (status === 'expired') {
+      return palette.expiredText;
+    }
+
+    return status === 'tomorrow' ? palette.tomorrowText : palette.itemText;
   }
 
   private tableRoomLabel(roomNumbers: number[]): string {

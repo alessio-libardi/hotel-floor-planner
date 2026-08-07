@@ -9,5 +9,12 @@ describe('SeatingCheckedChipComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[aria-label="Checked today"]')
     ).not.toBeNull();
+
+    const chip = fixture.nativeElement.querySelector('mat-chip');
+    expect(
+      chip.classList.contains(
+        'dark:[--mat-chip-elevated-container-color:#14532d]'
+      )
+    ).toBe(true);
   });
 });

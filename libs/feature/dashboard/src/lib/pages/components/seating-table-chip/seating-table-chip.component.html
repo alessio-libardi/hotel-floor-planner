@@ -1,13 +1,13 @@
 @if (tableNumber(); as number) {
   <mat-chip-set [attr.aria-label]="'Table ' + number">
     <mat-chip
-      class="print:border-black/30! print:bg-white! print:text-black!"
-      [class.bg-[#fef3c7]!]="departureStatus() === 'tomorrow'"
-      [class.text-[#78350f]!]="departureStatus() === 'tomorrow'"
-      [class.bg-(--mat-sys-error-container)!]="departureStatus() === 'expired'"
-      [class.text-(--mat-sys-on-error-container)!]="
-        departureStatus() === 'expired'
-      "
+      class="w-18! print:border-black/30! print:bg-white! print:text-black!"
+      [ngClass]="{
+        '[--mat-chip-elevated-container-color:#fef3c7] [--mat-chip-label-text-color:#78350f] [--mat-chip-outline-color:#f59e0b] text-[#78350f]! dark:[--mat-chip-elevated-container-color:#78350f] dark:[--mat-chip-label-text-color:#fef3c7] dark:[--mat-chip-outline-color:#f59e0b] dark:text-[#fef3c7]!':
+          departureStatus() === 'tomorrow',
+        '[--mat-chip-elevated-container-color:var(--mat-sys-error-container)] [--mat-chip-label-text-color:var(--mat-sys-on-error-container)] [--mat-chip-outline-color:var(--mat-sys-error)] text-(--mat-sys-on-error-container)!':
+          departureStatus() === 'expired',
+      }"
       [disableRipple]="true"
     >
       <mat-icon matChipAvatar aria-hidden="true">table_restaurant</mat-icon>
@@ -15,7 +15,9 @@
     </mat-chip>
   </mat-chip-set>
 } @else {
-  <span class="text-xs font-medium opacity-70 print:text-black!">
+  <span
+    class="inline-flex w-18 items-center justify-center text-center text-xs font-medium opacity-70 print:text-black!"
+  >
     No table
   </span>
 }

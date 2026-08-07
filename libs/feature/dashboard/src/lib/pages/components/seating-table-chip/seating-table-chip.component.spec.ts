@@ -11,6 +11,11 @@ describe('SeatingTableChipComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[aria-label="Table 12"]')
     ).not.toBeNull();
+    expect(
+      fixture.nativeElement
+        .querySelector('mat-chip')
+        .classList.contains('w-18!')
+    ).toBe(true);
   });
 
   it('renders the empty table state', () => {
@@ -18,12 +23,17 @@ describe('SeatingTableChipComponent', () => {
     fixture.componentRef.setInput('tableNumber', null);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('No table');
+    const emptyState = fixture.nativeElement.querySelector('span');
+    expect(emptyState.textContent).toContain('No table');
+    expect(emptyState.classList.contains('w-18')).toBe(true);
   });
 
   it.each([
-    ['tomorrow', 'bg-[#fef3c7]!'],
-    ['expired', 'bg-(--mat-sys-error-container)!'],
+    ['tomorrow', '[--mat-chip-elevated-container-color:#fef3c7]'],
+    [
+      'expired',
+      '[--mat-chip-elevated-container-color:var(--mat-sys-error-container)]',
+    ],
   ] as const)(
     'applies the %s departure color to the chip',
     (status, colorClass) => {

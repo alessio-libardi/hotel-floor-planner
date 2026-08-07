@@ -29,7 +29,7 @@
 
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 12px;
-  background: var(--mat-sys-surface);
+  background: var(--mat-sys-surface-container-low);
   overscroll-behavior: contain;
 }
 
@@ -54,10 +54,10 @@
   min-height: 0;
   padding: 0.25rem 0.5rem max(0.25rem, env(safe-area-inset-bottom));
 
-  border: 1px solid color-mix(in oklab, var(--mat-sys-primary) 34%, transparent);
+  border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 9999px;
-  background: var(--mat-sys-primary-container);
-  color: var(--mat-sys-on-primary-container);
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
   overflow-x: auto;
 }
 
@@ -83,8 +83,8 @@
 }
 
 .layout-lock-button-active {
-  background: var(--mat-sys-primary);
-  color: var(--mat-sys-on-primary);
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
 }
 
 .layout-toolbar-spacer {
