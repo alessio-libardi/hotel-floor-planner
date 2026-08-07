@@ -130,7 +130,7 @@
     mat-button
     type="button"
     color="warn"
-    [disabled]="isSaving"
+    [disabled]="isSaving || isLayoutLocked()"
     (click)="deleteSelected()"
   >
     Delete
@@ -139,7 +139,7 @@
     <button
       mat-button
       type="button"
-      [disabled]="isSaving || isMiddleLinkedTable()"
+      [disabled]="isSaving || isLayoutLocked() || isMiddleLinkedTable()"
       (click)="resetTable()"
     >
       Reset table

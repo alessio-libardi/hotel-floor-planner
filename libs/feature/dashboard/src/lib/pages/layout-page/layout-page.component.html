@@ -9,6 +9,7 @@
         mat-icon-button
         type="button"
         aria-label="Add table"
+        [disabled]="isLayoutLocked()"
         (click)="addTable()"
       >
         <mat-icon>table_restaurant</mat-icon>
@@ -17,6 +18,7 @@
         mat-icon-button
         type="button"
         aria-label="Add container"
+        [disabled]="isLayoutLocked()"
         (click)="addColumn()"
       >
         <mat-icon>inventory_2</mat-icon>
@@ -33,6 +35,20 @@
         (click)="resetView()"
       >
         <mat-icon>center_focus_strong</mat-icon>
+      </button>
+      <button
+        mat-flat-button
+        class="layout-lock-button"
+        [class.layout-lock-button-active]="isLayoutLocked()"
+        type="button"
+        [attr.aria-pressed]="isLayoutLocked()"
+        [attr.aria-label]="
+          isLayoutLocked() ? 'Layout locked. Enable editing' : 'Lock layout'
+        "
+        (click)="toggleLayoutLock()"
+      >
+        <mat-icon>{{ isLayoutLocked() ? 'lock' : 'lock_open' }}</mat-icon>
+        <span>{{ isLayoutLocked() ? 'Layout locked' : 'Lock layout' }}</span>
       </button>
     </div>
   </mat-toolbar>

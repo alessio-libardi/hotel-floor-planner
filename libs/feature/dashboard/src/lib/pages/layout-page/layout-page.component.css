@@ -75,6 +75,18 @@
   flex: 0 0 3rem;
 }
 
+.layout-toolbar .layout-lock-button {
+  width: auto;
+  min-width: 3rem;
+  padding-inline: 1rem;
+  flex: 0 0 auto;
+}
+
+.layout-lock-button-active {
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+
 .layout-toolbar-spacer {
   flex: 1 1 auto;
   min-width: 0.5rem;

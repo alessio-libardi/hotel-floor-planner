@@ -25,6 +25,7 @@ import {
   normalizeRoomNumbers,
   primaryRoomNumber,
 } from '../../room-assignment';
+import { LayoutLockService } from './layout-lock.service';
 
 export interface ShapeDetailRoomOption {
   floorId: string;
@@ -77,7 +78,9 @@ export class ShapeDetailDialogComponent {
 
   private readonly store = inject(PlanLayoutStore);
   private readonly floorStore = inject(FloorStore);
+  private readonly layoutLock = inject(LayoutLockService);
   private readonly dialogRef = inject(MatDialogRef<ShapeDetailDialogComponent>);
+  protected readonly isLayoutLocked = this.layoutLock.locked;
   protected readonly data = inject<ShapeDetailDialogData>(MAT_DIALOG_DATA);
 
   constructor() {
@@ -143,6 +146,10 @@ export class ShapeDetailDialogComponent {
   }
 
   protected async deleteSelected(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     this.isSaving = true;
     this.saveErrorMessage = '';
     try {
@@ -272,11 +279,16 @@ export class ShapeDetailDialogComponent {
       this.hasInvalidDateRange() ||
       this.hasInvalidTableNumber() ||
       this.hasDuplicateTableNumber() ||
+      this.isLayoutLocked() ||
       this.isSaving
     );
   }
 
   protected async save(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     this.attemptedSubmit = true;
     this.saveErrorMessage = '';
 
@@ -369,7 +381,11 @@ export class ShapeDetailDialogComponent {
   }
 
   protected async resetTable(): Promise<void> {
-    if (this.selectedItem.type !== 'table' || this.isSaving) {
+    if (
+      this.selectedItem.type !== 'table' ||
+      this.isSaving ||
+      this.isLayoutLocked()
+    ) {
       return;
     }
 

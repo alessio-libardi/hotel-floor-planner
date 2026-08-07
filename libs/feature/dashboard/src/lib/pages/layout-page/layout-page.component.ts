@@ -5,6 +5,8 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  effect,
+  inject,
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,7 +15,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import Konva from 'konva';
-import { inject } from '@angular/core';
 import { firstValueFrom, Subscription, fromEvent } from 'rxjs';
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
@@ -32,11 +33,14 @@ import {
   ShapeDetailRoomOption,
 } from './shape-detail-dialog.component';
 import {
-  distanceBetween,
   GesturePoint,
+  GestureViewport,
   LayoutGestureMachine,
-  midpoint,
+  PinchPoints,
+  viewportForPinch,
 } from './layout-gesture';
+import { LayoutLockService } from './layout-lock.service';
+import { LayoutUnlockDialogComponent } from './layout-unlock-dialog.component';
 
 const GRID_SIZE = 24;
 const GRID_EXTENT = 6000;
@@ -72,7 +76,9 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private readonly snackBar = inject(MatSnackBar);
   private readonly store = inject(PlanLayoutStore);
   private readonly floorStore = inject(FloorStore);
+  private readonly layoutLock = inject(LayoutLockService);
   private readonly gestures = new LayoutGestureMachine();
+  protected readonly isLayoutLocked = this.layoutLock.locked;
 
   private viewScale = 1;
   private viewX = 0;
@@ -99,8 +105,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     x: number;
     y: number;
   } | null = null;
-  private pinchLastCenter: GesturePoint | null = null;
-  private pinchLastDistance = 0;
+  private pinchStart: {
+    points: PinchPoints;
+    viewport: GestureViewport;
+  } | null = null;
+  private pinchFrameId: number | null = null;
   private linkSourceId: string | null = null;
   private linkTargetId: string | null = null;
   private linkSourceOutline: Konva.Rect | null = null;
@@ -108,6 +117,14 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private linkPreviewLine: Konva.Line | null = null;
   private linkPreviewLabel: Konva.Label | null = null;
   private linkPulseAnimation: Konva.Animation | null = null;
+
+  constructor() {
+    effect(() => {
+      if (this.isLayoutLocked()) {
+        this.disableLayoutEditing();
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
     this.initStage();
@@ -140,6 +157,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.cancelLinkHold();
+    this.cancelPinchUpdate();
     this.linkPulseAnimation?.stop();
     this.pointerListeners?.abort();
     this.floorsSub?.unsubscribe();
@@ -149,16 +167,28 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected async addTable(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     const item = await this.store.addItem('table');
     this.selectById(item.id);
   }
 
   protected async addColumn(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     const item = await this.store.addItem('column');
     this.selectById(item.id);
   }
 
   protected async removeSelected(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     const selected = this.selectedItem();
     if (!selected) {
       return;
@@ -173,6 +203,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected async openSelectedEditor(): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     const selected = this.selectedItem();
     if (!selected) {
       return;
@@ -192,7 +226,46 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     await firstValueFrom(dialogRef.afterClosed());
 
-    this.selectById(selected.id);
+    if (!this.isLayoutLocked()) {
+      this.selectById(selected.id);
+    }
+  }
+
+  protected async toggleLayoutLock(): Promise<void> {
+    if (!this.isLayoutLocked()) {
+      this.layoutLock.setLocked(true);
+      this.showGestureStatus('Layout locked.');
+      return;
+    }
+
+    const dialogRef = this.dialog.open<
+      LayoutUnlockDialogComponent,
+      void,
+      boolean
+    >(LayoutUnlockDialogComponent, {
+      width: '420px',
+      maxWidth: '90vw',
+      restoreFocus: true,
+    });
+    const confirmed = await firstValueFrom(dialogRef.afterClosed());
+
+    if (confirmed) {
+      this.layoutLock.setLocked(false);
+      this.showGestureStatus('Layout editing enabled.');
+    }
+  }
+
+  private disableLayoutEditing(): void {
+    this.cancelPinchUpdate();
+    this.cancelLinkHold();
+    this.restoreItemGesturePosition();
+    this.clearLinkFeedback();
+    this.gestures.cancelAll();
+    this.finishPointerInteraction();
+    this.selectedItem.set(null);
+    this.transformer?.nodes([]);
+    this.renderItems();
+    this.dialog.closeAll();
   }
 
   protected resetView(): void {
@@ -293,7 +366,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       signal: this.pointerListeners.signal,
     } as AddEventListenerOptions;
 
-    content.style.cursor = 'grab';
+    content.style.cursor = 'default';
     content.addEventListener(
       'pointerdown',
       (event) => this.onPointerDown(event),
@@ -342,7 +415,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       };
     }
 
-    const item = this.itemFromNode(hit);
+    const item = this.isLayoutLocked() ? null : this.itemFromNode(hit);
     const previousState = this.gestures.state;
     const state = this.gestures.begin(
       event.pointerId,
@@ -364,11 +437,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     if (state === 'pinch') {
       this.cancelLinkHold();
-      if (previousState === 'item-move') {
-        this.restoreItemGesturePosition();
+      if (previousState !== 'pinch') {
+        if (previousState === 'item-move') {
+          this.restoreItemGesturePosition();
+        }
+        this.clearLinkFeedback();
+        this.startPinch();
       }
-      this.clearLinkFeedback();
-      this.startPinch();
       return;
     }
 
@@ -394,7 +469,8 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     if (this.gestures.pointerCount === 0) {
       const item = this.itemAtPoint(point);
-      this.stage.getContent().style.cursor = item ? 'pointer' : 'grab';
+      this.stage.getContent().style.cursor =
+        !this.isLayoutLocked() && item ? 'pointer' : 'default';
       return;
     }
 
@@ -403,7 +479,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     const state = this.gestures.move(event.pointerId, point);
 
     if (state === 'pinch') {
-      this.updatePinch();
+      this.schedulePinchUpdate();
       return;
     }
 
@@ -412,13 +488,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         this.cancelLinkHold();
       }
       this.moveGestureItem(point);
-      this.stage.getContent().style.cursor = 'grabbing';
-      return;
-    }
-
-    if (state === 'pan') {
-      this.cancelLinkHold();
-      this.panTo(point);
       this.stage.getContent().style.cursor = 'grabbing';
       return;
     }
@@ -435,6 +504,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
 
     event.preventDefault();
     const point = this.pointerPoint(event);
+    if (this.gestures.state === 'pinch') {
+      this.gestures.move(event.pointerId, point);
+      this.flushPinchUpdate();
+    }
     const ended = this.gestures.end(event.pointerId, point);
     if (!ended) {
       return;
@@ -473,11 +546,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    if (ended.state === 'pan') {
-      this.finishPointerInteraction();
-      return;
-    }
-
     if (ended.target?.kind === 'item' && ended.target.itemId) {
       this.selectById(ended.target.itemId);
       void this.openSelectedEditor();
@@ -495,6 +563,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     event.preventDefault();
+    this.cancelPinchUpdate();
     this.cancelLinkHold();
     this.restoreItemGesturePosition();
     this.clearLinkFeedback();
@@ -511,6 +580,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private startLinkHold(pointerId: number, itemId: string): void {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     this.cancelLinkHold();
     this.linkHoldTimer = setTimeout(() => {
       this.linkHoldTimer = null;
@@ -535,56 +608,66 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private startPinch(): void {
-    const points = this.gestures.points();
-    if (points.length < 2) {
+    const points = this.gestures.pinchPoints();
+    if (!points) {
       return;
     }
 
-    this.pinchLastCenter = midpoint(points[0], points[1]);
-    this.pinchLastDistance = distanceBetween(points[0], points[1]);
+    this.cancelPinchUpdate();
+    this.pinchStart = {
+      points: [{ ...points[0] }, { ...points[1] }],
+      viewport: {
+        x: this.viewX,
+        y: this.viewY,
+        scale: this.viewScale,
+      },
+    };
     if (this.stage) {
       this.stage.getContent().style.cursor = 'grabbing';
     }
   }
 
-  private updatePinch(): void {
-    const points = this.gestures.points();
-    if (
-      points.length < 2 ||
-      !this.pinchLastCenter ||
-      this.pinchLastDistance <= 0
-    ) {
+  private schedulePinchUpdate(): void {
+    if (this.pinchFrameId != null) {
       return;
     }
 
-    const nextCenter = midpoint(points[0], points[1]);
-    const nextDistance = distanceBetween(points[0], points[1]);
-    const worldX = (this.pinchLastCenter.x - this.viewX) / this.viewScale;
-    const worldY = (this.pinchLastCenter.y - this.viewY) / this.viewScale;
-    const nextScale = this.clamp(
-      this.viewScale * (nextDistance / this.pinchLastDistance),
+    this.pinchFrameId = requestAnimationFrame(() => {
+      this.pinchFrameId = null;
+      this.applyPinchUpdate();
+    });
+  }
+
+  private flushPinchUpdate(): void {
+    this.cancelPinchUpdate();
+    this.applyPinchUpdate();
+  }
+
+  private applyPinchUpdate(): void {
+    const points = this.gestures.pinchPoints();
+    if (!points || !this.pinchStart) {
+      return;
+    }
+
+    const viewport = viewportForPinch(
+      this.pinchStart.viewport,
+      this.pinchStart.points,
+      points,
       MIN_SCALE,
       MAX_SCALE
     );
 
-    this.viewScale = nextScale;
-    this.viewX = nextCenter.x - worldX * nextScale;
-    this.viewY = nextCenter.y - worldY * nextScale;
-    this.pinchLastCenter = nextCenter;
-    this.pinchLastDistance = nextDistance;
+    this.viewX = viewport.x;
+    this.viewY = viewport.y;
+    this.viewScale = viewport.scale;
     this.applyViewportTransform();
   }
 
-  private panTo(point: GesturePoint): void {
-    const start = this.gestures.primaryStart();
-    const view = this.interactionStartView;
-    if (!start || !view) {
-      return;
+  private cancelPinchUpdate(): void {
+    if (this.pinchFrameId != null) {
+      cancelAnimationFrame(this.pinchFrameId);
+      this.pinchFrameId = null;
     }
-
-    this.viewX = view.x + point.x - start.x;
-    this.viewY = view.y + point.y - start.y;
-    this.applyViewportTransform();
   }
 
   private moveGestureItem(point: GesturePoint): void {
@@ -609,6 +692,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   private async commitGestureItemMove(): Promise<void> {
     const itemStart = this.itemGestureStart;
     if (!itemStart) {
+      return;
+    }
+
+    if (this.isLayoutLocked()) {
+      this.restoreItemGesturePosition();
       return;
     }
 
@@ -638,12 +726,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private finishPointerInteraction(): void {
+    this.cancelPinchUpdate();
     this.interactionStartView = null;
     this.itemGestureStart = null;
-    this.pinchLastCenter = null;
-    this.pinchLastDistance = 0;
+    this.pinchStart = null;
     if (this.stage) {
-      this.stage.getContent().style.cursor = 'grab';
+      this.stage.getContent().style.cursor = 'default';
     }
   }
 
@@ -660,6 +748,11 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private beginLinkFeedback(sourceId: string, point: GesturePoint): void {
+    if (this.isLayoutLocked()) {
+      this.gestures.cancelAll();
+      return;
+    }
+
     const source = this.store.items.find(
       (item) => item.id === sourceId && item.type === 'table'
     );
@@ -1121,7 +1214,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private attachContainerResizeHandle(): void {
-    if (!this.itemLayer || !this.transformer) {
+    if (this.isLayoutLocked() || !this.itemLayer || !this.transformer) {
       return;
     }
 
@@ -1170,7 +1263,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private async commitContainerResize(): Promise<void> {
-    if (!this.itemLayer || !this.transformer) {
+    if (this.isLayoutLocked() || !this.itemLayer || !this.transformer) {
       return;
     }
 
@@ -1366,6 +1459,10 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     sourceTableId: string,
     targetTableId: string
   ): Promise<void> {
+    if (this.isLayoutLocked()) {
+      return;
+    }
+
     const source = this.store.items.find(
       (item) => item.id === sourceTableId && item.type === 'table'
     );

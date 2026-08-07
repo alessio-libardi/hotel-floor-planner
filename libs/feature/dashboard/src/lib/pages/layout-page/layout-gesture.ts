@@ -2,7 +2,6 @@ export const GESTURE_MOVE_THRESHOLD = 10;
 
 export type LayoutGestureState =
   | 'idle'
-  | 'pan'
   | 'item-move'
   | 'pinch'
   | 'link-arming'
@@ -11,6 +10,14 @@ export type LayoutGestureState =
 export interface GesturePoint {
   x: number;
   y: number;
+}
+
+export type PinchPoints = readonly [GesturePoint, GesturePoint];
+
+export interface GestureViewport {
+  x: number;
+  y: number;
+  scale: number;
 }
 
 export interface GestureTarget {
@@ -35,6 +42,7 @@ export class LayoutGestureMachine {
   private readonly pointers = new Map<number, TrackedPointer>();
   private primaryPointerId: number | null = null;
   private primaryTarget: GestureTarget | null = null;
+  private pinchPointerIds: readonly [number, number] | null = null;
 
   state: LayoutGestureState = 'idle';
 
@@ -54,6 +62,10 @@ export class LayoutGestureMachine {
     this.pointers.set(pointerId, { start: point, current: point });
 
     if (this.pointers.size >= 2) {
+      if (!this.pinchPointerIds) {
+        const [firstPointerId, secondPointerId] = this.pointers.keys();
+        this.pinchPointerIds = [firstPointerId, secondPointerId];
+      }
       this.state = 'pinch';
       return this.state;
     }
@@ -85,7 +97,9 @@ export class LayoutGestureMachine {
       return this.state;
     }
 
-    this.state = this.primaryTarget?.kind === 'item' ? 'item-move' : 'pan';
+    if (this.primaryTarget?.kind === 'item') {
+      this.state = 'item-move';
+    }
     return this.state;
   }
 
@@ -135,8 +149,14 @@ export class LayoutGestureMachine {
     this.reset();
   }
 
-  points(): GesturePoint[] {
-    return [...this.pointers.values()].map((pointer) => pointer.current);
+  pinchPoints(): PinchPoints | null {
+    if (!this.pinchPointerIds) {
+      return null;
+    }
+
+    const first = this.pointers.get(this.pinchPointerIds[0]);
+    const second = this.pointers.get(this.pinchPointerIds[1]);
+    return first && second ? [first.current, second.current] : null;
   }
 
   primaryPoint(): GesturePoint | null {
@@ -159,6 +179,7 @@ export class LayoutGestureMachine {
     this.pointers.clear();
     this.primaryPointerId = null;
     this.primaryTarget = null;
+    this.pinchPointerIds = null;
     this.state = 'idle';
   }
 }
@@ -178,4 +199,39 @@ export function midpoint(
     x: (left.x + right.x) / 2,
     y: (left.y + right.y) / 2,
   };
+}
+
+export function viewportForPinch(
+  initialViewport: GestureViewport,
+  initialPoints: PinchPoints,
+  currentPoints: PinchPoints,
+  minScale: number,
+  maxScale: number
+): GestureViewport {
+  const initialCenter = midpoint(initialPoints[0], initialPoints[1]);
+  const currentCenter = midpoint(currentPoints[0], currentPoints[1]);
+  const initialDistance = distanceBetween(initialPoints[0], initialPoints[1]);
+
+  if (initialDistance <= 0 || initialViewport.scale <= 0) {
+    return initialViewport;
+  }
+
+  const currentDistance = distanceBetween(currentPoints[0], currentPoints[1]);
+  const scale = clamp(
+    initialViewport.scale * (currentDistance / initialDistance),
+    minScale,
+    maxScale
+  );
+  const worldX = (initialCenter.x - initialViewport.x) / initialViewport.scale;
+  const worldY = (initialCenter.y - initialViewport.y) / initialViewport.scale;
+
+  return {
+    x: currentCenter.x - worldX * scale,
+    y: currentCenter.y - worldY * scale,
+    scale,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
