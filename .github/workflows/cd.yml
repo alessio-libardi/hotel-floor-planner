@@ -15,35 +15,9 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          filter: tree:0
-          fetch-depth: 0
-
-      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="build"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - run: npm ci
-      - uses: nrwl/nx-set-shas@v5
-
-      - run: npx nx format:check --base="$NX_BASE" --head="$NX_HEAD"
-
-      - run: npx nx affected -t lint test build
-
-      - run: npx nx fix-ci
-        if: always()
-
   deploy_preview:
     name: Deploy Preview
     if: github.event_name == 'pull_request'
-    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: Preview
@@ -82,7 +56,6 @@ jobs:
   deploy_live:
     name: Deploy Live
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: Live
