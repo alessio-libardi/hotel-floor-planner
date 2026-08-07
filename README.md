@@ -18,16 +18,18 @@ npm install
 npm run start
 ```
 
+`npm run start` now starts the `api` application first, which boots the local Firebase emulator Docker stack, and then starts the Angular `app` application.
+
 ## Local Firebase emulator
 
-The project uses `evolutecx/firebase-emulator` via `docker-compose.emulators.yml`.
+The project uses `evolutecx/firebase-emulator` via `apps/api/docker-compose.yml`.
 In this devcontainer/codespace setup, the emulator stack is started automatically on startup.
 
 Manual commands:
 
 ```bash
-docker compose -f docker-compose.emulators.yml up -d
-docker compose -f docker-compose.emulators.yml down
+nx serve api
+nx run api:stop
 ```
 
 Important local URLs:
@@ -37,6 +39,13 @@ Important local URLs:
 - Auth emulator: http://localhost:9099
 
 When the app runs on `localhost`/`127.0.0.1`, it connects to these emulators automatically.
+
+Firebase configuration now lives under `apps/api`, including:
+
+- `firebase.json`
+- `firestore.rules`
+- `firestore.indexes.json`
+- `docker-compose.yml`
 
 ## Firebase setup
 

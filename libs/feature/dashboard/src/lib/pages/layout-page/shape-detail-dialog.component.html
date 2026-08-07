@@ -12,6 +12,9 @@
       (input)="onPrimaryFieldInput($any($event.target).value)"
       [placeholder]="primaryFieldPlaceholder()"
     />
+    @if (selectedItem.type === 'table') {
+      <mat-hint>{{ tableNumberHint() }}</mat-hint>
+    }
     @if (
       selectedItem.type === 'table' &&
       attemptedSubmit &&
@@ -113,19 +116,30 @@
     Changes are saved only when you press Save.
   </p>
   @if (saveErrorMessage) {
-    <p class="shape-detail-dialog-error">{{ saveErrorMessage }}</p>
+    <p class="shape-detail-dialog-error" role="alert">
+      {{ saveErrorMessage }}
+    </p>
+  }
+  @if (isMiddleLinkedTable()) {
+    <p class="shape-detail-dialog-error">{{ middleTableActionMessage() }}</p>
   }
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button type="button" color="warn" (click)="deleteSelected()">
+  <button
+    mat-button
+    type="button"
+    color="warn"
+    [disabled]="isSaving || isLayoutLocked()"
+    (click)="deleteSelected()"
+  >
     Delete
   </button>
   @if (selectedItem.type === 'table') {
     <button
       mat-button
       type="button"
-      [disabled]="isSaving"
+      [disabled]="isSaving || isLayoutLocked() || isMiddleLinkedTable()"
       (click)="resetTable()"
     >
       Reset table

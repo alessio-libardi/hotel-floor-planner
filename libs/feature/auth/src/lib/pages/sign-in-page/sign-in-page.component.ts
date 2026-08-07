@@ -7,7 +7,7 @@ import {
 import { LogoComponent } from '@ui/components';
 
 @Component({
-  selector: 'feature-auth-sign-in',
+  selector: 'lib-feature-auth-sign-in',
   imports: [
     GoogleSignInButtonComponent,
     LogoComponent,

@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "hotel-floor-planner"
+    "preview": "hotel-floor-planner---preview",
+    "live": "hotel-floor-planner"
   }
 }

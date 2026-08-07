@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
+  "root": "apps/app",
   "sourceRoot": "apps/app/src",
   "tags": [],
   "targets": {
@@ -83,6 +84,12 @@
       }
     },
     "serve": {
+      "dependsOn": [
+        {
+          "projects": "api",
+          "target": "serve"
+        }
+      ],
       "continuous": true,
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
@@ -101,12 +108,6 @@
     "lint": {
       "executor": "@nx/eslint:lint"
     },
-    "test": {
-      "executor": "@angular/build:unit-test",
-      "options": {
-        "watch": false
-      }
-    },
     "serve-static": {
       "continuous": true,
       "executor": "@nx/web:file-server",
@@ -114,6 +115,31 @@
         "buildTarget": "app:build",
         "staticFilePath": "dist/apps/app/browser",
         "spa": true
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        {
+          "target": "build",
+          "params": "forward"
+        }
+      ],
+      "options": {
+        "command": "firebase deploy --only hosting"
+      },
+      "inputs": ["default", "{workspaceRoot}/firebase.json"],
+      "configurations": {
+        "preview": {
+          "command": "firebase deploy --project hotel-floor-planner---preview --only hosting"
+        },
+        "live": {
+          "command": "firebase deploy --only hosting"
+        }
+      },
+
+      "metadata": {
+        "description": "Deploy app to firebase"
       }
     }
   }

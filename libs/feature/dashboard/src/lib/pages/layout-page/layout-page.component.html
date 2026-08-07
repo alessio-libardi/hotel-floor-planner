@@ -3,51 +3,13 @@
     <div #stageHost class="layout-stage"></div>
   </div>
 
-  <mat-toolbar class="layout-toolbar mat-elevation-z8">
-    <div class="layout-toolbar-group">
-      <button
-        mat-icon-button
-        class="layout-mode-button"
-        [class.layout-mode-button--active]="isPanMode()"
-        type="button"
-        aria-label="Pan mode"
-        [attr.aria-pressed]="isPanMode()"
-        (click)="setPanMode(true)"
-      >
-        <mat-icon>open_with</mat-icon>
-      </button>
-      <button
-        mat-icon-button
-        class="layout-mode-button"
-        [class.layout-mode-button--active]="!isPanMode() && !isLinkMode()"
-        type="button"
-        aria-label="Edit mode"
-        [attr.aria-pressed]="!isPanMode() && !isLinkMode()"
-        (click)="setPanMode(false)"
-      >
-        <mat-icon>drag_indicator</mat-icon>
-      </button>
-      <button
-        mat-icon-button
-        class="layout-mode-button"
-        [class.layout-mode-button--active]="isLinkMode()"
-        type="button"
-        aria-label="Link mode"
-        [attr.aria-pressed]="isLinkMode()"
-        (click)="setLinkMode(!isLinkMode())"
-      >
-        <mat-icon>link</mat-icon>
-      </button>
-      <span class="layout-mode-indicator">{{ currentModeLabel() }}</span>
-    </div>
-
-    <span class="layout-toolbar-spacer"></span>
-
+  <mat-toolbar class="layout-toolbar mat-elevation-z2">
     <div class="layout-toolbar-group">
       <button
         mat-icon-button
         type="button"
         aria-label="Add table"
+        [disabled]="isLayoutLocked()"
         (click)="addTable()"
       >
         <mat-icon>table_restaurant</mat-icon>
@@ -56,6 +18,7 @@
         mat-icon-button
         type="button"
         aria-label="Add container"
+        [disabled]="isLayoutLocked()"
         (click)="addColumn()"
       >
         <mat-icon>inventory_2</mat-icon>
@@ -68,36 +31,25 @@
       <button
         mat-icon-button
         type="button"
-        aria-label="Zoom out"
-        (click)="zoomOut()"
-      >
-        <mat-icon>remove</mat-icon>
-      </button>
-      <button
-        mat-icon-button
-        type="button"
-        aria-label="Reset view"
+        aria-label="Center and fit layout"
         (click)="resetView()"
       >
         <mat-icon>center_focus_strong</mat-icon>
       </button>
       <button
-        mat-icon-button
+        mat-flat-button
+        class="layout-lock-button"
+        [class.layout-lock-button-active]="isLayoutLocked()"
         type="button"
-        aria-label="Zoom in"
-        (click)="zoomIn()"
+        [attr.aria-pressed]="isLayoutLocked()"
+        [attr.aria-label]="
+          isLayoutLocked() ? 'Layout locked. Enable editing' : 'Lock layout'
+        "
+        (click)="toggleLayoutLock()"
       >
-        <mat-icon>add</mat-icon>
+        <mat-icon>{{ isLayoutLocked() ? 'lock' : 'lock_open' }}</mat-icon>
+        <span>{{ isLayoutLocked() ? 'Layout locked' : 'Lock layout' }}</span>
       </button>
     </div>
   </mat-toolbar>
-
-  @if (isLinkMode()) {
-    <p class="layout-link-hint">
-      {{
-        linkModeStatus() ||
-          'Select a table, then click another table to link or unlink.'
-      }}
-    </p>
-  }
 </section>
