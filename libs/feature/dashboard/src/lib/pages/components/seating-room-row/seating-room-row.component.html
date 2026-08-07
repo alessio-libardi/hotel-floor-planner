@@ -1,0 +1,34 @@
+<button
+  mat-list-item
+  type="button"
+  class="h-auto! min-h-12! touch-manipulation py-1! transition-[background-color,color] duration-200 ease-out print:bg-white! print:text-black!"
+  title="Double-click or double-tap to toggle checked today"
+  (click)="handleClick($event)"
+>
+  <div
+    class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+  >
+    <span class="min-w-0 text-left">
+      <span class="block truncate">Room {{ room().number }}</span>
+
+      @if (room().note; as roomNote) {
+        <span
+          class="block truncate text-xs opacity-70 print:text-black! print:opacity-100"
+        >
+          {{ roomNote }}
+        </span>
+      }
+    </span>
+
+    <span class="inline-flex min-w-0 shrink-0 items-center justify-end gap-1.5">
+      @if (room().checkedToday) {
+        <lib-seating-checked-chip />
+      }
+
+      <lib-seating-table-chip
+        [tableNumber]="room().tableNumber"
+        [departureStatus]="room().departureStatus"
+      />
+    </span>
+  </div>
+</button>

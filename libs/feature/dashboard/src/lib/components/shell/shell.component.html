@@ -25,7 +25,7 @@
 
   <mat-drawer-content class="shell-content">
     <header
-      class="border-b border-(--mat-sys-outline-variant) bg-(--mat-sys-surface)"
+      class="border-b border-(--mat-sys-outline-variant) bg-(--mat-sys-surface) print:hidden"
     >
       <mat-toolbar class="flex items-center gap-3 bg-(--mat-sys-surface) px-4">
         @if (isSmallViewport()) {
@@ -88,7 +88,9 @@
       </mat-toolbar>
     </header>
 
-    <main class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4">
+    <main
+      class="flex-1 overflow-auto bg-(--mat-sys-surface-variant) p-4 print:overflow-visible! print:bg-white! print:p-0!"
+    >
       <router-outlet></router-outlet>
     </main>
   </mat-drawer-content>

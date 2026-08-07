@@ -1,0 +1,33 @@
+<mat-card
+  appearance="outlined"
+  class="min-w-0 h-full print:break-inside-avoid print:border-black/30! print:bg-white! print:text-black! print:shadow-none!"
+>
+  <mat-card-header
+    class="flex items-start justify-between gap-2 border-b border-(--mat-sys-outline-variant) pb-2! print:border-black/30!"
+  >
+    <mat-card-title class="print:text-black!">
+      Floor {{ floor().number }}
+    </mat-card-title>
+    <mat-card-subtitle class="print:text-black!">
+      {{ floor().rooms.length }} rooms
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <mat-action-list
+      class="overflow-hidden py-1.5 print:bg-white! print:text-black!"
+    >
+      @for (room of floor().rooms; track room.id) {
+        <lib-seating-room-row
+          [room]="room"
+          (selected)="roomSelected.emit(room)"
+          (checkedChange)="emitCheckedChange(room, $event)"
+        />
+      } @empty {
+        <mat-list-item>
+          <div matListItemTitle>No rooms</div>
+        </mat-list-item>
+      }
+    </mat-action-list>
+  </mat-card-content>
+</mat-card>

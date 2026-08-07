@@ -1,74 +1,60 @@
-import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { AsyncPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { DragDropModule, CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import {
   combineLatest,
   defer,
   from,
   map,
   Observable,
-  startWith,
   shareReplay,
+  startWith,
   switchMap,
   timer,
 } from 'rxjs';
 import { FloorViewModel } from '../../floor.models';
 import { FloorStore } from '../../floor.store';
 import { PlanLayoutStore } from '../../plan-layout.store';
+import { SeatingFloorColumnComponent } from '../components/seating-floor-column/seating-floor-column.component';
 import {
-  getRoomDepartureStatus,
-  TOMORROW_HIGHLIGHT_BACKGROUND,
-  TOMORROW_HIGHLIGHT_FOREGROUND,
-} from '../../room-departure-status';
-import { SeatingTableDialogComponent } from './seating-table-dialog.component';
-
-interface RoomTableAssignment {
-  tableNumber: string;
-}
-
-interface SeatingViewModel {
-  floors: FloorViewModel[];
-  roomToTableMap: Map<number, RoomTableAssignment>;
-  roomNoteMap: Map<number, string | null>;
-  today: string;
-}
+  SeatingRoomNoteDialogComponent,
+  SeatingRoomNoteDialogData,
+} from '../components/seating-room-note-dialog/seating-room-note-dialog.component';
+import {
+  createSeatingFloors,
+  SeatingPageViewModel,
+  SeatingRoomCheckChange,
+  SeatingRoomViewModel,
+} from './seating-view-model';
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
-const SWIPE_ACTION_THRESHOLD = 64;
-const SWIPE_CLICK_SUPPRESSION_MS = 500;
 
 @Component({
   selector: 'lib-seating-page',
   imports: [
-    CommonModule,
-    DragDropModule,
+    AsyncPipe,
     MatButtonModule,
-    MatCardModule,
-    MatDialogModule,
     MatIconModule,
-    MatListModule,
+    SeatingFloorColumnComponent,
   ],
   templateUrl: './seating-page.component.html',
   styleUrls: ['./seating-page.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SeatingPageComponent {
   private readonly floorStore = inject(FloorStore);
   private readonly planStore = inject(PlanLayoutStore);
   private readonly dialog = inject(MatDialog);
-  private readonly swipeClickSuppression = new Map<string, number>();
 
-  protected readonly floors$: Observable<FloorViewModel[]> = defer(() =>
+  private readonly floors$: Observable<FloorViewModel[]> = defer(() =>
     from(this.floorStore.ensureLoaded()).pipe(
       switchMap(() => this.floorStore.floors$)
     )
   ).pipe(shareReplay(1));
 
-  protected readonly today$ = timer(
+  private readonly today$ = timer(
     this.msUntilTomorrow(),
     DAY_IN_MILLISECONDS
   ).pipe(
@@ -77,156 +63,41 @@ export class SeatingPageComponent {
     shareReplay(1)
   );
 
-  protected readonly roomToTableMap$ = this.planStore.items$.pipe(
-    map((items) => {
-      const roomToTableMap = new Map<number, RoomTableAssignment>();
-
-      for (const item of items) {
-        if (item.type !== 'table' || item.displayTableNumber == null) {
-          continue;
-        }
-
-        for (const roomNumber of item.roomNumbers) {
-          roomToTableMap.set(roomNumber, {
-            tableNumber: item.displayTableNumber,
-          });
-        }
-      }
-
-      return roomToTableMap;
-    }),
-    shareReplay(1)
-  );
-
-  protected readonly roomNoteMap$ = this.floors$.pipe(
-    map((floors) => {
-      const roomNoteMap = new Map<number, string | null>();
-      for (const floor of floors) {
-        for (const room of floor.rooms) {
-          roomNoteMap.set(room.number, room.note);
-        }
-      }
-      return roomNoteMap;
-    }),
-    shareReplay(1)
-  );
-
-  protected readonly vm$: Observable<SeatingViewModel> = combineLatest({
+  protected readonly vm$: Observable<SeatingPageViewModel> = combineLatest({
     floors: this.floors$,
-    roomToTableMap: this.roomToTableMap$,
-    roomNoteMap: this.roomNoteMap$,
+    items: this.planStore.items$,
     today: this.today$,
-  });
+  }).pipe(
+    map(({ floors, items, today }) => ({
+      floors: createSeatingFloors(floors, items, today),
+    })),
+    shareReplay(1)
+  );
 
-  protected trackByFloor(_index: number, floor: FloorViewModel): string {
-    return floor.id;
+  protected openRoomDetails(room: SeatingRoomViewModel): void {
+    this.dialog.open<SeatingRoomNoteDialogComponent, SeatingRoomNoteDialogData>(
+      SeatingRoomNoteDialogComponent,
+      {
+        width: 'min(90vw, 420px)',
+        data: {
+          roomNumber: room.number,
+          note: room.note,
+        },
+      }
+    );
   }
 
-  protected trackByRoom(_index: number, room: { id: string }): string {
-    return room.id;
-  }
-
-  protected openTableDetails(roomNumber: number, note: string | null): void {
-    this.dialog.open(SeatingTableDialogComponent, {
-      width: 'min(90vw, 420px)',
-      data: {
-        roomNumber,
-        note,
-      },
-    });
-  }
-
-  protected handleRoomDragEnded(
-    roomId: string,
-    checkedDate: string | null,
-    today: string,
-    drag: CdkDrag,
-    event: CdkDragEnd
-  ): void {
-    const deltaX = event.distance.x;
-
-    if (deltaX <= -SWIPE_ACTION_THRESHOLD) {
-      this.swipeClickSuppression.set(roomId, Date.now());
-      void this.floorStore.markRoomCheckedToday(roomId);
-    } else if (deltaX >= SWIPE_ACTION_THRESHOLD && checkedDate === today) {
-      this.swipeClickSuppression.set(roomId, Date.now());
-      void this.floorStore.clearRoomCheckedToday(roomId);
-    }
-
-    drag.reset();
-  }
-
-  protected handleRoomClick(
-    roomId: string,
-    roomNumber: number,
-    note: string | null,
-    event: MouseEvent
-  ): void {
-    const suppressedAt = this.swipeClickSuppression.get(roomId);
-
-    if (
-      suppressedAt != null &&
-      Date.now() - suppressedAt < SWIPE_CLICK_SUPPRESSION_MS
-    ) {
-      this.swipeClickSuppression.delete(roomId);
-      event.preventDefault();
-      event.stopPropagation();
+  protected handleRoomCheckedChange(change: SeatingRoomCheckChange): void {
+    if (change.checked) {
+      void this.floorStore.markRoomCheckedToday(change.roomId);
       return;
     }
 
-    this.swipeClickSuppression.delete(roomId);
-
-    this.openTableDetails(roomNumber, note);
-  }
-
-  protected tableNumberForRoom(
-    roomToTableMap: Map<number, RoomTableAssignment>,
-    roomNumber: number
-  ): string | null {
-    return roomToTableMap.get(roomNumber)?.tableNumber ?? null;
-  }
-
-  protected noteForRoom(
-    roomNoteMap: Map<number, string | null>,
-    roomNumber: number
-  ): string | null {
-    return roomNoteMap.get(roomNumber) ?? null;
-  }
-
-  protected isCheckedToday(checkedDate: string | null, today: string): boolean {
-    return checkedDate === today;
+    void this.floorStore.clearRoomCheckedToday(change.roomId);
   }
 
   protected printPage(): void {
     window.print();
-  }
-
-  protected roomRowBackground(departureDate: string | null): string | null {
-    const status = getRoomDepartureStatus(departureDate);
-
-    if (status === 'tomorrow') {
-      return TOMORROW_HIGHLIGHT_BACKGROUND;
-    }
-
-    if (status === 'expired') {
-      return 'var(--mat-sys-error-container)';
-    }
-
-    return null;
-  }
-
-  protected roomRowForeground(departureDate: string | null): string | null {
-    const status = getRoomDepartureStatus(departureDate);
-
-    if (status === 'tomorrow') {
-      return TOMORROW_HIGHLIGHT_FOREGROUND;
-    }
-
-    if (status === 'expired') {
-      return 'var(--mat-sys-on-error-container)';
-    }
-
-    return null;
   }
 
   private formatDateOnly(value: Date): string {
