@@ -1,16 +1,15 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, BehaviorSubject } from 'rxjs';
 import { FloorPlannerApi } from './floor-planner.api';
 import { FloorViewModel, RoomViewModel } from './floor.models';
 
 @Injectable({ providedIn: 'root' })
 export class FloorStore {
+  private readonly api = inject(FloorPlannerApi);
   private readonly floorsSubject = new BehaviorSubject<FloorViewModel[]>([]);
   private loaded = false;
 
   readonly floors$ = this.floorsSubject.asObservable();
-
-  constructor(private readonly api: FloorPlannerApi) {}
 
   get floors(): FloorViewModel[] {
     return this.floorsSubject.value;

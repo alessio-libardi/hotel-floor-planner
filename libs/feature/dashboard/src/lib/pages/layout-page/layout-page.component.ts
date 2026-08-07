@@ -48,7 +48,7 @@ const MIN_CONTAINER_SIZE = GRID_SIZE;
 const LINK_HOLD_DELAY = 450;
 
 @Component({
-  selector: 'app-layout-page',
+  selector: 'lib-layout-page',
   imports: [
     CommonModule,
     MatButtonModule,

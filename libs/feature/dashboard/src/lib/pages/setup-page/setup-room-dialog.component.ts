@@ -25,7 +25,7 @@ export interface SetupRoomDialogResult {
 }
 
 @Component({
-  selector: 'app-setup-room-dialog',
+  selector: 'lib-setup-room-dialog',
   imports: [
     CommonModule,
     ReactiveFormsModule,

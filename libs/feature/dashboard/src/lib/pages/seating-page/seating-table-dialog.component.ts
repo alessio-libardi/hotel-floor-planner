@@ -15,7 +15,7 @@ export interface SeatingTableDialogData {
 }
 
 @Component({
-  selector: 'app-seating-table-dialog',
+  selector: 'lib-seating-table-dialog',
   imports: [
     CommonModule,
     MatDialogModule,

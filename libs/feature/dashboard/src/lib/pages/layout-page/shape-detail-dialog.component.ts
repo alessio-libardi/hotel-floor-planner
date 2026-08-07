@@ -46,7 +46,7 @@ type RoomStayRange = FormGroup<{
 }>;
 
 @Component({
-  selector: 'app-shape-detail-dialog',
+  selector: 'lib-shape-detail-dialog',
   imports: [
     CommonModule,
     ReactiveFormsModule,

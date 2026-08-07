@@ -19,7 +19,7 @@ import {
 } from './setup-room-dialog.component';
 
 @Component({
-  selector: 'app-setup-page',
+  selector: 'lib-setup-page',
   imports: [
     CommonModule,
     MatButtonModule,
@@ -32,13 +32,10 @@ import {
   styleUrls: ['./setup-page.component.css'],
 })
 export class SetupPageComponent implements OnInit {
-  protected readonly floors$;
-
   private readonly dialog = inject(MatDialog);
+  private readonly floorStore = inject(FloorStore);
 
-  constructor(private readonly floorStore: FloorStore) {
-    this.floors$ = this.floorStore.floors$;
-  }
+  protected readonly floors$ = this.floorStore.floors$;
 
   async ngOnInit(): Promise<void> {
     await this.floorStore.ensureLoaded();
