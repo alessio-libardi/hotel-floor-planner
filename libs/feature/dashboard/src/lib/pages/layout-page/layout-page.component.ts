@@ -24,11 +24,8 @@ import {
   TOMORROW_HIGHLIGHT_BACKGROUND,
   TOMORROW_HIGHLIGHT_FOREGROUND,
 } from '../../room-departure-status';
-import {
-  compareTableNumbers,
-  nextGeneratedTableNumber,
-} from '../../table-number';
 import { formatTableRoomLabel } from '../../room-assignment';
+import { TableChainRuleFailure } from '../../table-link-chain';
 import {
   ShapeDetailDialogComponent,
   ShapeDetailDialogData,
@@ -39,7 +36,6 @@ import {
   GesturePoint,
   LayoutGestureMachine,
   midpoint,
-  tableLinkChange,
 } from './layout-gesture';
 
 const GRID_SIZE = 24;
@@ -49,7 +45,6 @@ const MAX_SCALE = 2.6;
 const SCALE_STEP = 1.15;
 const FOCUS_PADDING = 64;
 const MIN_CONTAINER_SIZE = GRID_SIZE;
-const MAX_TABLE_LINKS = 2;
 const LINK_HOLD_DELAY = 450;
 
 @Component({
@@ -169,8 +164,12 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    await this.store.deleteItem(selected.id);
-    this.selectedItem.set(null);
+    try {
+      await this.store.deleteItem(selected.id);
+      this.selectedItem.set(null);
+    } catch {
+      this.showGestureStatus('Unable to delete this item right now.');
+    }
   }
 
   protected async openSelectedEditor(): Promise<void> {
@@ -759,22 +758,20 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       candidate?.type === 'table' && candidate.id !== source.id
         ? candidate
         : null;
-    const currentlyLinked = validTarget
-      ? source.linkedTableIds.includes(validTarget.id)
-      : false;
     const linkChange = validTarget
-      ? tableLinkChange(source, validTarget, MAX_TABLE_LINKS)
+      ? this.store.tableChainChange(source.id, validTarget.id)
       : null;
     const linkBlocked = linkChange != null && !linkChange.ok;
+    const willUnlink = linkChange?.ok && linkChange.action === 'unlink';
     const color =
-      currentlyLinked || linkBlocked
+      willUnlink || linkBlocked
         ? '#dc2626'
         : validTarget
           ? '#16a34a'
           : '#f59e0b';
     const label = linkBlocked
-      ? 'Link limit reached'
-      : currentlyLinked
+      ? this.tableChainRuleLabel(linkChange.reason)
+      : willUnlink
         ? 'Unlink'
         : validTarget
           ? 'Link'
@@ -1000,7 +997,7 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
         new Konva.Text({
           x: 8,
           y: 7,
-          text: item.tableNumber ?? '?',
+          text: item.displayTableNumber ?? '?',
           fontSize: 11,
           fontStyle: 'bold',
           fill: this.itemTextColor(item),
@@ -1334,133 +1331,6 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     return status;
   }
 
-  private async syncLinkedTableNumbers(anchorTableId: string): Promise<void> {
-    const tables = this.store.items.filter((item) => item.type === 'table');
-    if (tables.length === 0) {
-      return;
-    }
-
-    const components = this.getTableLinkComponents(tables);
-    let nextTableNumber = Number(
-      nextGeneratedTableNumber(tables.map((table) => table.tableNumber))
-    );
-    const usedNumbers = new Set<string>();
-    const updates: Array<Promise<void>> = [];
-
-    const orderedComponents = [...components].sort((left, right) => {
-      const leftHasAnchor = left.some((table) => table.id === anchorTableId);
-      const rightHasAnchor = right.some((table) => table.id === anchorTableId);
-
-      if (leftHasAnchor !== rightHasAnchor) {
-        return leftHasAnchor ? -1 : 1;
-      }
-
-      const leftNumbers = left
-        .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is string => tableNumber != null);
-      const rightNumbers = right
-        .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is string => tableNumber != null);
-
-      const leftMinNumber =
-        leftNumbers.length > 0
-          ? [...leftNumbers].sort(compareTableNumbers)[0]
-          : null;
-      const rightMinNumber =
-        rightNumbers.length > 0
-          ? [...rightNumbers].sort(compareTableNumbers)[0]
-          : null;
-
-      if (leftMinNumber != null && rightMinNumber != null) {
-        if (leftMinNumber !== rightMinNumber) {
-          return compareTableNumbers(leftMinNumber, rightMinNumber);
-        }
-      }
-
-      return left[0].id.localeCompare(right[0].id);
-    });
-
-    for (const component of orderedComponents) {
-      const existingNumbers = component
-        .map((table) => table.tableNumber)
-        .filter((tableNumber): tableNumber is string => tableNumber != null)
-        .sort(compareTableNumbers);
-
-      let targetNumber = existingNumbers.find(
-        (tableNumber) => !usedNumbers.has(tableNumber)
-      );
-
-      if (targetNumber == null) {
-        targetNumber = `${nextTableNumber}`;
-        nextTableNumber += 1;
-      }
-
-      usedNumbers.add(targetNumber);
-
-      for (const table of component) {
-        if (table.tableNumber !== targetNumber) {
-          updates.push(
-            this.store.updateItem(table.id, { tableNumber: targetNumber })
-          );
-        }
-      }
-    }
-
-    await Promise.all(updates);
-  }
-
-  private getTableLinkComponents(tables: PlanItem[]): PlanItem[][] {
-    const tableById = new Map(tables.map((table) => [table.id, table]));
-    const visited = new Set<string>();
-    const components: PlanItem[][] = [];
-
-    for (const table of tables) {
-      if (visited.has(table.id)) {
-        continue;
-      }
-
-      const component: PlanItem[] = [];
-      const stack = [table.id];
-
-      while (stack.length > 0) {
-        const tableId = stack.pop();
-        if (!tableId || visited.has(tableId)) {
-          continue;
-        }
-
-        const current = tableById.get(tableId);
-        if (!current) {
-          continue;
-        }
-
-        visited.add(tableId);
-        component.push(current);
-
-        for (const linkedTableId of current.linkedTableIds) {
-          if (tableById.has(linkedTableId) && !visited.has(linkedTableId)) {
-            stack.push(linkedTableId);
-          }
-        }
-
-        for (const candidate of tables) {
-          if (
-            candidate.id !== current.id &&
-            candidate.linkedTableIds.includes(current.id) &&
-            !visited.has(candidate.id)
-          ) {
-            stack.push(candidate.id);
-          }
-        }
-      }
-
-      if (component.length > 0) {
-        components.push(component);
-      }
-    }
-
-    return components;
-  }
-
   private zoomBy(factor: number, center?: { x: number; y: number }): void {
     if (!this.stage) {
       return;
@@ -1508,26 +1378,13 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const change = tableLinkChange(source, target, MAX_TABLE_LINKS);
+    const change = this.store.tableChainChange(source.id, target.id);
     if (!change.ok) {
-      const message =
-        change.reason === 'source-full'
-          ? 'This table already has 2 linked tables.'
-          : change.reason === 'target-full'
-            ? 'The target already has 2 linked tables.'
-            : 'Choose another table.';
-      this.showGestureStatus(message);
+      this.showGestureStatus(this.tableChainRuleMessage(change.reason));
       return;
     }
 
-    await this.store.updateItem(source.id, {
-      linkedTableIds: change.sourceLinks,
-    });
-    await this.store.updateItem(target.id, {
-      linkedTableIds: change.targetLinks,
-    });
-
-    await this.syncLinkedTableNumbers(source.id);
+    const action = await this.store.toggleTableLink(source.id, target.id);
 
     const refreshedSource = this.store.items.find(
       (item) => item.id === source.id
@@ -1537,9 +1394,33 @@ export class LayoutPageComponent implements AfterViewInit, OnDestroy {
     }
 
     this.showGestureStatus(
-      change.action === 'unlink' ? 'Tables unlinked.' : 'Tables linked.'
+      action === 'unlink' ? 'Tables unlinked.' : 'Tables linked.'
     );
     this.renderItems();
+  }
+
+  private tableChainRuleLabel(reason: TableChainRuleFailure): string {
+    switch (reason) {
+      case 'source-middle':
+      case 'target-middle':
+        return 'Link from a chain end';
+      case 'same-group':
+        return 'Already in this group';
+      case 'table-not-found':
+        return 'Choose another table';
+    }
+  }
+
+  private tableChainRuleMessage(reason: TableChainRuleFailure): string {
+    switch (reason) {
+      case 'source-middle':
+      case 'target-middle':
+        return 'Tables can only be linked from chain ends.';
+      case 'same-group':
+        return 'These tables are already in the same linked group.';
+      case 'table-not-found':
+        return 'Could not find one of the selected tables.';
+    }
   }
 
   private showGestureStatus(message: string): void {

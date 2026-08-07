@@ -2,7 +2,6 @@ import {
   distanceBetween,
   LayoutGestureMachine,
   midpoint,
-  tableLinkChange,
 } from './layout-gesture';
 
 describe('LayoutGestureMachine', () => {
@@ -77,57 +76,5 @@ describe('LayoutGestureMachine', () => {
       x: 20,
       y: 35,
     });
-  });
-
-  it('builds symmetric link and unlink updates', () => {
-    expect(
-      tableLinkChange(
-        { id: 'a', linkedTableIds: [] },
-        { id: 'b', linkedTableIds: [] },
-        2
-      )
-    ).toEqual({
-      ok: true,
-      action: 'link',
-      sourceLinks: ['b'],
-      targetLinks: ['a'],
-    });
-
-    expect(
-      tableLinkChange(
-        { id: 'a', linkedTableIds: ['b'] },
-        { id: 'b', linkedTableIds: ['a'] },
-        2
-      )
-    ).toEqual({
-      ok: true,
-      action: 'unlink',
-      sourceLinks: [],
-      targetLinks: [],
-    });
-  });
-
-  it('rejects self-links and full endpoints', () => {
-    expect(
-      tableLinkChange(
-        { id: 'a', linkedTableIds: [] },
-        { id: 'a', linkedTableIds: [] },
-        2
-      )
-    ).toEqual({ ok: false, reason: 'same-table' });
-    expect(
-      tableLinkChange(
-        { id: 'a', linkedTableIds: ['b', 'c'] },
-        { id: 'd', linkedTableIds: [] },
-        2
-      )
-    ).toEqual({ ok: false, reason: 'source-full' });
-    expect(
-      tableLinkChange(
-        { id: 'a', linkedTableIds: [] },
-        { id: 'd', linkedTableIds: ['b', 'c'] },
-        2
-      )
-    ).toEqual({ ok: false, reason: 'target-full' });
   });
 });

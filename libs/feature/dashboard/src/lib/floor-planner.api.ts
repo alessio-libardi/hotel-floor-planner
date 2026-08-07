@@ -10,7 +10,7 @@ import {
   query,
   runTransaction,
   updateDoc,
-  where,
+  writeBatch,
 } from 'firebase/firestore';
 import { from } from 'rxjs';
 import { FloorViewModel, RoomViewModel } from './floor.models';
@@ -37,6 +37,28 @@ export interface PlanItemDto {
   roomNumber: number | null;
   roomNumbers: number[];
   linkedTableIds: string[];
+  isTableNumberAnchor: boolean;
+}
+
+export type PlanItemUpdatePatch = Partial<
+  Pick<
+    PlanItemDto,
+    | 'x'
+    | 'y'
+    | 'width'
+    | 'height'
+    | 'text'
+    | 'tableNumber'
+    | 'roomNumber'
+    | 'roomNumbers'
+    | 'linkedTableIds'
+    | 'isTableNumberAnchor'
+  >
+>;
+
+export interface PlanItemUpdate {
+  id: string;
+  patch: PlanItemUpdatePatch;
 }
 
 interface RoomDoc {
@@ -65,6 +87,7 @@ interface PlanItemDoc {
   roomNumber: number | null;
   roomNumbers?: number[];
   linkedTableIds: string[];
+  isTableNumberAnchor?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -122,28 +145,12 @@ export class FloorPlannerApi {
     return from(this.createPlanItemInternal(type));
   }
 
-  updatePlanItem(
-    itemId: string,
-    patch: Partial<
-      Pick<
-        PlanItemDto,
-        | 'x'
-        | 'y'
-        | 'width'
-        | 'height'
-        | 'text'
-        | 'tableNumber'
-        | 'roomNumber'
-        | 'roomNumbers'
-        | 'linkedTableIds'
-      >
-    >
-  ) {
+  updatePlanItem(itemId: string, patch: PlanItemUpdatePatch) {
     return from(this.updatePlanItemInternal(itemId, patch));
   }
 
-  deletePlanItem(itemId: string) {
-    return from(this.deletePlanItemInternal(itemId));
+  applyPlanItemChanges(updates: PlanItemUpdate[], deletedIds: string[] = []) {
+    return from(this.applyPlanItemChangesInternal(updates, deletedIds));
   }
 
   private async getFloorsInternal(): Promise<FloorViewModel[]> {
@@ -466,6 +473,7 @@ export class FloorPlannerApi {
         roomNumber: null,
         roomNumbers: [],
         linkedTableIds: [],
+        isTableNumberAnchor: type === 'table',
       };
 
       transaction.set(itemRef, payload);
@@ -475,20 +483,7 @@ export class FloorPlannerApi {
 
   private async updatePlanItemInternal(
     itemId: string,
-    patch: Partial<
-      Pick<
-        PlanItemDto,
-        | 'x'
-        | 'y'
-        | 'width'
-        | 'height'
-        | 'text'
-        | 'tableNumber'
-        | 'roomNumber'
-        | 'roomNumbers'
-        | 'linkedTableIds'
-      >
-    >
+    patch: PlanItemUpdatePatch
   ): Promise<PlanItemDto> {
     this.auth.requireUser();
 
@@ -508,39 +503,24 @@ export class FloorPlannerApi {
     return this.toPlanItemModel(snapshot.id, snapshot.data() as PlanItemDoc);
   }
 
-  private async deletePlanItemInternal(
-    itemId: string
-  ): Promise<{ deleted: true }> {
+  private async applyPlanItemChangesInternal(
+    updates: PlanItemUpdate[],
+    deletedIds: string[]
+  ): Promise<void> {
     this.auth.requireUser();
 
-    const itemRef = doc(this.firestore, 'planItems', itemId);
-    const itemSnapshot = await getDoc(itemRef);
-    const item = itemSnapshot.exists()
-      ? (itemSnapshot.data() as PlanItemDoc)
-      : null;
-
-    await deleteDoc(itemRef);
-
-    if (item?.type === 'table') {
-      const linkedItemsSnapshot = await getDocs(
-        query(
-          collection(this.firestore, 'planItems'),
-          where('linkedTableIds', 'array-contains', itemId)
-        )
-      );
-
-      await Promise.all(
-        linkedItemsSnapshot.docs.map((entry) => {
-          const linkedTableIds = (
-            (entry.data() as PlanItemDoc).linkedTableIds ?? []
-          ).filter((linkedId) => linkedId !== itemId);
-
-          return updateDoc(entry.ref, { linkedTableIds });
-        })
-      );
+    const batch = writeBatch(this.firestore);
+    for (const update of updates) {
+      const payload = this.withDefinedValues(update.patch);
+      if (Object.keys(payload).length > 0) {
+        batch.update(doc(this.firestore, 'planItems', update.id), payload);
+      }
+    }
+    for (const deletedId of deletedIds) {
+      batch.delete(doc(this.firestore, 'planItems', deletedId));
     }
 
-    return { deleted: true };
+    await batch.commit();
   }
 
   private toFloorModel(id: string, floor: FloorDoc): FloorViewModel {
@@ -578,6 +558,7 @@ export class FloorPlannerApi {
       ),
       roomNumbers: normalizeRoomNumbers(item.roomNumbers, item.roomNumber),
       linkedTableIds: item.linkedTableIds ?? [],
+      isTableNumberAnchor: item.isTableNumberAnchor === true,
     };
   }
 

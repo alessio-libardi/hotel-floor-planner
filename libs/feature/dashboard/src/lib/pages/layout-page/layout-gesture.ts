@@ -31,18 +31,6 @@ export interface EndedGesture {
   end: GesturePoint;
 }
 
-export type TableLinkChange =
-  | {
-      ok: true;
-      action: 'link' | 'unlink';
-      sourceLinks: string[];
-      targetLinks: string[];
-    }
-  | {
-      ok: false;
-      reason: 'same-table' | 'source-full' | 'target-full';
-    };
-
 export class LayoutGestureMachine {
   private readonly pointers = new Map<number, TrackedPointer>();
   private primaryPointerId: number | null = null;
@@ -190,41 +178,4 @@ export function midpoint(
     x: (left.x + right.x) / 2,
     y: (left.y + right.y) / 2,
   };
-}
-
-export function tableLinkChange(
-  source: { id: string; linkedTableIds: string[] },
-  target: { id: string; linkedTableIds: string[] },
-  maximumLinks: number
-): TableLinkChange {
-  if (source.id === target.id) {
-    return { ok: false, reason: 'same-table' };
-  }
-
-  const currentlyLinked = source.linkedTableIds.includes(target.id);
-  if (!currentlyLinked && source.linkedTableIds.length >= maximumLinks) {
-    return { ok: false, reason: 'source-full' };
-  }
-  if (!currentlyLinked && target.linkedTableIds.length >= maximumLinks) {
-    return { ok: false, reason: 'target-full' };
-  }
-
-  return {
-    ok: true,
-    action: currentlyLinked ? 'unlink' : 'link',
-    sourceLinks: uniqueSortedIds(
-      currentlyLinked
-        ? source.linkedTableIds.filter((id) => id !== target.id)
-        : [...source.linkedTableIds, target.id]
-    ),
-    targetLinks: uniqueSortedIds(
-      currentlyLinked
-        ? target.linkedTableIds.filter((id) => id !== source.id)
-        : [...target.linkedTableIds, source.id]
-    ),
-  };
-}
-
-function uniqueSortedIds(ids: string[]): string[] {
-  return [...new Set(ids)].sort((left, right) => left.localeCompare(right));
 }

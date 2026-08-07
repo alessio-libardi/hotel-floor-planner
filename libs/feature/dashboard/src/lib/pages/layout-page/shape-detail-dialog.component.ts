@@ -15,13 +15,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { FloorStore } from '../../floor.store';
-import { PlanItem, PlanLayoutStore } from '../../plan-layout.store';
+import {
+  PlanItem,
+  PlanLayoutStore,
+  TableChainRuleError,
+} from '../../plan-layout.store';
 import {
   formatTableRoomLabel,
   normalizeRoomNumbers,
   primaryRoomNumber,
 } from '../../room-assignment';
-import { nextGeneratedTableNumber } from '../../table-number';
 
 export interface ShapeDetailRoomOption {
   floorId: string;
@@ -140,8 +143,17 @@ export class ShapeDetailDialogComponent {
   }
 
   protected async deleteSelected(): Promise<void> {
-    await this.store.deleteItem(this.selectedItem.id);
-    this.dialogRef.close({ deleted: true });
+    this.isSaving = true;
+    this.saveErrorMessage = '';
+    try {
+      await this.store.deleteItem(this.selectedItem.id);
+      this.dialogRef.close({ deleted: true });
+    } catch {
+      this.saveErrorMessage =
+        'Unable to delete this item right now. Please try again.';
+    } finally {
+      this.isSaving = false;
+    }
   }
 
   protected groupedRooms(): Array<{
@@ -361,6 +373,11 @@ export class ShapeDetailDialogComponent {
       return;
     }
 
+    if (this.isMiddleLinkedTable()) {
+      this.saveErrorMessage = this.middleTableActionMessage();
+      return;
+    }
+
     this.isSaving = true;
     this.saveErrorMessage = '';
 
@@ -369,34 +386,53 @@ export class ShapeDetailDialogComponent {
         this.store.items.find((item) => item.id === this.selectedItem.id) ??
         this.selectedItem;
 
+      await this.store.detachTable(currentTable.id);
       await this.clearRoomDates(currentTable.roomNumbers);
-      await this.unlinkTable(currentTable);
-
-      const resetTableNumber =
-        currentTable.linkedTableIds.length > 0
-          ? nextGeneratedTableNumber(
-              this.store.items
-                .filter(
-                  (item) => item.type === 'table' && item.id !== currentTable.id
-                )
-                .map((item) => item.tableNumber)
-            )
-          : currentTable.tableNumber;
 
       await this.store.updateItem(currentTable.id, {
-        linkedTableIds: [],
         roomNumber: null,
         roomNumbers: [],
-        tableNumber: resetTableNumber,
       });
 
       this.dialogRef.close({ reset: true });
-    } catch {
+    } catch (error) {
       this.saveErrorMessage =
-        'Unable to reset this table right now. Please try again.';
+        error instanceof TableChainRuleError
+          ? this.middleTableActionMessage()
+          : 'Unable to reset this table right now. Please try again.';
     } finally {
       this.isSaving = false;
     }
+  }
+
+  protected isMiddleLinkedTable(): boolean {
+    if (this.selectedItem.type !== 'table') {
+      return false;
+    }
+
+    const current = this.store.items.find(
+      (item) => item.id === this.selectedItem.id
+    );
+    return (current?.linkedTableIds.length ?? 0) >= 2;
+  }
+
+  protected middleTableActionMessage(): string {
+    return 'Reset is unavailable for a middle table. Unlink one connection first.';
+  }
+
+  protected tableNumberHint(): string {
+    const current = this.store.items.find(
+      (item) => item.id === this.selectedItem.id
+    );
+    if (
+      current?.type === 'table' &&
+      current.linkedTableIds.length > 0 &&
+      current.displayTableNumber !== current.tableNumber
+    ) {
+      return `Own number. This linked chain currently displays ${current.displayTableNumber}.`;
+    }
+
+    return 'Permanent number used again when this table is unlinked.';
   }
 
   private async persistTableRoomAssignment(): Promise<void> {
@@ -441,7 +477,10 @@ export class ShapeDetailDialogComponent {
           return;
         }
 
-        const fg = this.roomStayRanges.get(roomNumber)!;
+        const fg = this.roomStayRanges.get(roomNumber);
+        if (!fg) {
+          return;
+        }
         const arrivalDate = this.formatDateOnly(fg.controls.start.value);
         const departureDate = this.formatDateOnly(fg.controls.end.value);
         const note = (this.draftRoomNotes.get(roomNumber) ?? '').trim() || null;
@@ -487,30 +526,6 @@ export class ShapeDetailDialogComponent {
           arrivalDate: null,
           departureDate: null,
           note: null,
-        });
-      })
-    );
-  }
-
-  private async unlinkTable(table: PlanItem): Promise<void> {
-    if (table.linkedTableIds.length === 0) {
-      return;
-    }
-
-    await Promise.all(
-      table.linkedTableIds.map(async (linkedTableId) => {
-        const linkedTable = this.store.items.find(
-          (item) => item.id === linkedTableId && item.type === 'table'
-        );
-
-        if (!linkedTable) {
-          return;
-        }
-
-        await this.store.updateItem(linkedTable.id, {
-          linkedTableIds: linkedTable.linkedTableIds.filter(
-            (entry) => entry !== table.id
-          ),
         });
       })
     );
