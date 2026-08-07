@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   main:
+    name: Verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +20,7 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
-      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="build"
+      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="lint,test,build"
 
       - uses: actions/setup-node@v4
         with:
@@ -31,7 +32,7 @@ jobs:
 
       - run: npx nx format:check --base="$NX_BASE" --head="$NX_HEAD"
 
-      - run: npx nx affected -t lint test build
+      - run: npx nx affected -t lint test build --base="$NX_BASE" --head="$NX_HEAD"
 
       - run: npx nx fix-ci
         if: always()

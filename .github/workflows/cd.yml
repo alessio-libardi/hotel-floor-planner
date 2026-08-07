@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   deploy_preview:
-    name: Deploy Preview
+    name: Deploy
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     environment:
@@ -27,9 +27,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Start Nx Cloud CI run
-        run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="deploy"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,10 +48,10 @@ jobs:
         uses: nrwl/nx-set-shas@v5
 
       - name: Deploy preview
-        run: npx nx affected -t deploy --projects=app,api --configuration=preview
+        run: npx nx affected -t deploy --configuration=preview --base="$NX_BASE" --head="$NX_HEAD"
 
   deploy_live:
-    name: Deploy Live
+    name: Deploy
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
@@ -65,9 +62,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Start Nx Cloud CI run
-        run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="deploy"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,4 +83,4 @@ jobs:
         uses: nrwl/nx-set-shas@v5
 
       - name: Deploy live
-        run: npx nx affected -t deploy --projects=app,api --configuration=live
+        run: npx nx affected -t deploy --configuration=live --base="$NX_BASE" --head="$NX_HEAD"
